@@ -1,0 +1,10 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  round(load_1min::numeric, 2)::float as load_1min,\n  round(load_5min::numeric,\
+  \ 2)::float as load_5min,\n  round(load_15min::numeric, 2)::float as load_15min\n\
+  from\n  get_load_average();"
+metrics: []
+init_sql: "CREATE EXTENSION IF NOT EXISTS plpython3u;\nCREATE OR REPLACE FUNCTION\
+  \ get_load_average(OUT load_1min float, OUT load_5min float, OUT load_15min float)\
+  \ AS\n$$\n  from os import getloadavg\n  la = getloadavg()\n  return [la[0], la[1],\
+  \ la[2]]\n$$ LANGUAGE plpython3u VOLATILE;\nGRANT EXECUTE ON FUNCTION get_load_average()\
+  \ TO pgwatch;\nCOMMENT ON FUNCTION get_load_average() is 'created for pgwatch';"

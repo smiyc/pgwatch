@@ -1,0 +1,31 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  dir_or_tablespace as tag_dir_or_tablespace,\n  path as tag_path,\n\
+  \  total, used, free, percent\nfrom\n  get_psutil_disk()\n"
+metrics: []
+init_sql: "CREATE EXTENSION IF NOT EXISTS plpython3u; \n\nCREATE OR REPLACE FUNCTION\
+  \ get_psutil_disk(\n\tOUT dir_or_tablespace text, OUT path text, OUT total float8,\
+  \ OUT used float8, OUT free float8, OUT percent float8\n)\n RETURNS SETOF record\n\
+  \ LANGUAGE plpython3u\n SECURITY DEFINER\nAS $FUNCTION$\n\nfrom os import stat\n\
+  from os.path import join, exists\nfrom psutil import disk_usage\nret_list = []\n\
+  \n# data_directory\nr = plpy.execute(\"select current_setting('data_directory')\
+  \ as dd, current_setting('log_directory') as ld, current_setting('server_version_num')::int\
+  \ as pgver\")\ndd = r[0]['dd']\nld = r[0]['ld']\ndu_dd = disk_usage(dd)\nret_list.append(['data_directory',\
+  \ dd, du_dd.total, du_dd.used, du_dd.free, du_dd.percent])\n\ndd_stat = stat(dd)\n\
+  # log_directory\nif ld:\n    if not ld.startswith('/'):\n        ld_path = join(dd,\
+  \ ld)\n    else:\n        ld_path = ld\n    if exists(ld_path):\n        log_stat\
+  \ = stat(ld_path)\n        if log_stat.st_dev == dd_stat.st_dev:\n            pass\
+  \                                # no new info, same device\n        else:\n   \
+  \         du = disk_usage(ld_path)\n            ret_list.append(['log_directory',\
+  \ ld_path, du.total, du.used, du.free, du.percent])\n\n# WAL / XLOG directory\n\
+  # plpy.notice('pg_wal' if r[0]['pgver'] >= 100000 else 'pg_xlog', r[0]['pgver'])\n\
+  joined_path_wal = join(r[0]['dd'], 'pg_wal' if r[0]['pgver'] >= 100000 else 'pg_xlog')\n\
+  wal_stat = stat(joined_path_wal)\nif wal_stat.st_dev == dd_stat.st_dev:\n    pass\
+  \                                # no new info, same device\nelse:\n    du = disk_usage(joined_path_wal)\n\
+  \    ret_list.append(['pg_wal', joined_path_wal, du.total, du.used, du.free, du.percent])\n\
+  \n# add user created tablespaces if any\nsql_tablespaces = \"\"\"\n    select spcname\
+  \ as name, pg_catalog.pg_tablespace_location(oid) as location\n    from pg_catalog.pg_tablespace\
+  \ where not spcname like any(array[E'pg\\\\_%'])\"\"\"\nfor row in plpy.cursor(sql_tablespaces):\n\
+  \    du = disk_usage(row['location'])\n    ret_list.append([row['name'], row['location'],\
+  \ du.total, du.used, du.free, du.percent])\nreturn ret_list\n\n$FUNCTION$;\n\nGRANT\
+  \ EXECUTE ON FUNCTION get_psutil_disk() TO pgwatch;\nCOMMENT ON FUNCTION get_psutil_disk()\
+  \ IS 'created for pgwatch';"

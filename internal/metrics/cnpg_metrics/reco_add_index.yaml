@@ -1,0 +1,16 @@
+query: "with r as (select /* pgwatch_generated */\n    (regexp_matches(v::text, E'ON\
+  \ (.*?) '))[1] as object_name,\n    COALESCE(v->>'ddl', v::text) as recommendation,\n\
+  \    v->>'queryids' as queryids\n    from json_array_elements(pg_qualstats_index_advisor()\
+  \ -> 'indexes') v),\nlimited_r as (select * from r limit 10),\nrr as (select\n \
+  \   (extract(epoch from now()) * 1e9)::int8 as epoch_ns,\n    'create_index'::text\
+  \ as tag_reco_topic,\n    string_agg(object_name, ',') as tag_object_name,\n   \
+  \ string_agg(recommendation, ', ') as recommendation,\n    string_agg(queryids,\
+  \ ', ') as extra_info\n    from limited_r),\nlast_reco(s) as (\n    select case\
+  \ when count(*) > 10 then format(' and found %s more...', count(*)-10) end from\
+  \ r),\ntotal_count as (\n    select count(*) as total from r)\nselect \n    epoch_ns,\n\
+  \    tag_reco_topic,\n    concat(tag_object_name, s) as tag_object_name,\n    recommendation,\n\
+  \    case when extra_info > '' then 'affected queries: ' || extra_info end,\n  \
+  \  total as total_recommendations\nfrom rr, last_reco, total_count\nwhere tag_object_name\
+  \ > '';"
+metrics: []
+init_sql: CREATE EXTENSION IF NOT EXISTS pg_qualstats;

@@ -1,0 +1,11 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  read_count,\n  write_count,\n  read_bytes,\n  write_bytes\nfrom\n\
+  \  get_psutil_disk_io_total()\n"
+metrics: []
+init_sql: "CREATE EXTENSION IF NOT EXISTS plpython3u; \n\nCREATE OR REPLACE FUNCTION\
+  \ get_psutil_disk_io_total(\n\tOUT read_count float8, OUT write_count float8, OUT\
+  \ read_bytes float8, OUT write_bytes float8\n)\n LANGUAGE plpython3u\nAS $FUNCTION$\n\
+  from psutil import disk_io_counters\ndc = disk_io_counters(perdisk=False)\nif dc:\n\
+  \    return dc.read_count, dc.write_count, dc.read_bytes, dc.write_bytes\nelse:\n\
+  \    return None, None, None, None\n$FUNCTION$;\n\nGRANT EXECUTE ON FUNCTION get_psutil_disk_io_total()\
+  \ TO pgwatch;\nCOMMENT ON FUNCTION get_psutil_disk_io_total() IS 'created for pgwatch';"

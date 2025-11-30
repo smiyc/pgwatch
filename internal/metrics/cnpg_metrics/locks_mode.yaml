@@ -1,0 +1,8 @@
+query: "WITH q_locks AS (\n  select\n    *\n  from\n    pg_locks\n  where\n    pid\
+  \ != pg_backend_pid()\n    and database = (select oid from pg_database where datname\
+  \ = current_database())\n)\nselect /* pgwatch_generated */\n  (extract(epoch from\
+  \ now()) * 1e9)::int8 as epoch_ns,\n  lockmodes AS tag_lockmode,\n  coalesce((select\
+  \ count(*) FROM q_locks WHERE mode = lockmodes), 0) AS count\nFROM\n  unnest('{AccessShareLock,\
+  \ ExclusiveLock, RowShareLock, RowExclusiveLock, ShareLock, ShareRowExclusiveLock,\
+  \  AccessExclusiveLock, ShareUpdateExclusiveLock}'::text[]) lockmodes"
+metrics: []

@@ -1,0 +1,11 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  current_setting('block_size')::int8 * (\n    select sum(relpages)\
+  \ from pg_class c\n    join pg_namespace n on n.oid = c.relnamespace\n    where\
+  \ c.relpersistence != 't'\n  ) as size_b,\n  current_setting('block_size')::int8\
+  \ * (\n    select sum(c.relpages + coalesce(ct.relpages, 0) + coalesce(cti.relpages,\
+  \ 0))\n    from pg_class c\n    join pg_namespace n on n.oid = c.relnamespace\n\
+  \    left join pg_class ct on ct.oid = c.reltoastrelid\n    left join pg_index ti\
+  \ on ti.indrelid = ct.oid\n    left join pg_class cti on cti.oid = ti.indexrelid\n\
+  \    where nspname = 'pg_catalog'\n    and (c.relkind = 'r'\n      or c.relkind\
+  \ = 'i' and not c.relname ~ '^pg_toast')\n  ) as catalog_size_b"
+metrics: []

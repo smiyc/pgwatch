@@ -1,0 +1,8 @@
+query: "with r as (select  /* pgwatch_generated */\n\tcount(*) filter (where rolcanlogin\
+  \ and rolsuper) as su,\n\tcount(*) filter (where rolcanlogin) as users \n\tfrom\
+  \ pg_roles \n)\nselect\n  (extract(epoch from now()) * 1e9)::int8 as epoch_ns,\n\
+  \  'superuser_count'::text as tag_reco_topic,\n  '-'::text as tag_object_name,\n\
+  \  'too many superusers detected - review recommended'::text as recommendation,\n\
+  \  format('%s active superusers, %s total active users', r.su, r.users) as extra_info,\n\
+  \  1 as total_recommendations\nfrom\n  r\nwhere\n  r.su >= 10\n"
+metrics: []

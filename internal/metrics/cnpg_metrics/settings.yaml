@@ -1,0 +1,49 @@
+query: "with qs as (\n  select name, setting from pg_settings\n)\nselect /* pgwatch_generated\
+  \ */\n  (extract(epoch from now()) * 1e9)::int8 as epoch_ns,\n  current_setting('server_version')\
+  \ as server_version,\n  current_setting('server_version_num')::int8 as server_version_num,\n\
+  \  (regexp_matches(regexp_replace(current_setting('server_version'), '(beta|devel).*',\
+  \ '', 'g'), E'\\\\d+'))[1]::float8 as major_version,\n  current_setting('block_size')::int\
+  \ as block_size,\n  current_setting('max_connections')::int as max_connections,\n\
+  \  current_setting('hot_standby') as hot_standby,\n  (select setting from qs where\
+  \ name = 'hot_standby_feedback') as hot_standby_feedback,\n  current_setting('fsync')\
+  \ as fsync,\n  current_setting('full_page_writes') as full_page_writes,\n  current_setting('synchronous_commit')\
+  \ as synchronous_commit,\n  (select setting from qs where name = 'wal_compression')\
+  \ as wal_compression,\n  (select setting from qs where name = 'wal_log_hints') as\
+  \ wal_log_hints,\n  (select setting from qs where name = 'synchronous_standby_names')\
+  \ as synchronous_standby_names,\n  current_setting('shared_buffers') as shared_buffers,\n\
+  \  current_setting('work_mem') as work_mem,\n  current_setting('maintenance_work_mem')\
+  \ as maintenance_work_mem,\n  current_setting('effective_cache_size') as effective_cache_size,\n\
+  \  (select setting::int8 from qs where name = 'default_statistics_target') as default_statistics_target,\n\
+  \  (select setting::float8 from qs where name = 'random_page_cost') as random_page_cost,\n\
+  \  pg_size_pretty(((select setting::int8 from qs where name = 'min_wal_size') *\
+  \ 1024^2)::int8) as min_wal_size,\n  pg_size_pretty(((select setting::int8 from\
+  \ qs where name = 'max_wal_size') * 1024^2)::int8) as max_wal_size,\n  (select setting\
+  \ from qs where name = 'checkpoint_segments') as checkpoint_segments,\n  current_setting('checkpoint_timeout')\
+  \ as checkpoint_timeout,\n  current_setting('checkpoint_completion_target') as checkpoint_completion_target,\n\
+  \  (select setting::int8 from qs where name = 'max_worker_processes') as max_worker_processes,\n\
+  \  (select setting::int8 from qs where name = 'max_parallel_workers') as max_parallel_workers,\n\
+  \  (select setting::int8 from qs where name = 'max_parallel_workers_per_gather')\
+  \ as max_parallel_workers_per_gather,\n  (select case when setting = 'on' then 1\
+  \ else 0 end from qs where name = 'jit') as jit,\n  (select case when setting =\
+  \ 'on' then 1 else 0 end from qs where name = 'ssl') as ssl,\n  current_setting('statement_timeout')\
+  \ as statement_timeout,\n  current_setting('deadlock_timeout') as deadlock_timeout,\n\
+  \  (select setting from qs where name = 'data_checksums') as data_checksums,\n \
+  \ (select setting::int8 from qs where name = 'max_connections') as max_connections,\n\
+  \  (select setting::int8 from qs where name = 'max_wal_senders') as max_wal_senders,\n\
+  \  (select setting::int8 from qs where name = 'max_replication_slots') as max_replication_slots,\n\
+  \  (select setting::int8 from qs where name = 'max_prepared_transactions') as max_prepared_transactions,\n\
+  \  (select setting::int8 from qs where name = 'lock_timeout') || ' (ms)' as lock_timeout,\n\
+  \  (select setting from qs where name = 'archive_mode') as archive_mode,\n  (select\
+  \ setting from qs where name = 'archive_command') as archive_command,\n  current_setting('archive_timeout')\
+  \ as archive_timeout,\n  (select setting from qs where name = 'shared_preload_libraries')\
+  \ as shared_preload_libraries,\n  (select setting from qs where name = 'listen_addresses')\
+  \ as listen_addresses,\n  (select setting from qs where name = 'ssl') as ssl,\n\
+  \  (select setting from qs where name = 'autovacuum') as autovacuum,\n  (select\
+  \ setting::int8 from qs where name = 'autovacuum_max_workers') as autovacuum_max_workers,\n\
+  \  (select setting::float8 from qs where name = 'autovacuum_vacuum_scale_factor')\
+  \ as autovacuum_vacuum_scale_factor,\n  (select setting::float8 from qs where name\
+  \ = 'autovacuum_vacuum_threshold') as autovacuum_vacuum_threshold,\n  (select setting::float8\
+  \ from qs where name = 'autovacuum_analyze_scale_factor') as autovacuum_analyze_scale_factor,\n\
+  \  (select setting::float8 from qs where name = 'autovacuum_analyze_threshold')\
+  \ as autovacuum_analyze_scale_factor\n"
+metrics: []

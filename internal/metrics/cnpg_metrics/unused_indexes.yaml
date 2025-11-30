@@ -1,0 +1,12 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  *\nfrom (\n  select\n    format('%I.%I', sui.schemaname, sui.indexrelname)\
+  \ as tag_index_full_name,\n    sui.idx_scan,\n    coalesce(pg_relation_size(sui.indexrelid),\
+  \ 0) as index_size_b,\n    system_identifier::text as tag_sys_id /* to easily check\
+  \ also all replicas as could be still used there */\n  from\n    pg_stat_user_indexes\
+  \ sui\n    join pg_index i on i.indexrelid = sui.indexrelid\n    join pg_control_system()\
+  \ on true\n  where not sui.schemaname like E'pg\\\\_temp%'\n  and idx_scan = 0\n\
+  \  and not (indisprimary or indisunique or indisexclusion)\n  and not exists (select\
+  \ * from pg_locks where relation = sui.relid and mode = 'AccessExclusiveLock')\n\
+  ) x\nwhere index_size_b > 100*1024^2 /* list >100MB only */\norder by index_size_b\
+  \ desc\nlimit 25"
+metrics: []

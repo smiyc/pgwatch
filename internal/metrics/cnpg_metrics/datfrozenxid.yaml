@@ -1,0 +1,4 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  age(datfrozenxid) as datfrozenxid_age,\n  mxid_age(datminmxid)\
+  \ as datminmxid_age\nfrom \n  pg_database \nwhere \n  datname = current_database();"
+metrics: []

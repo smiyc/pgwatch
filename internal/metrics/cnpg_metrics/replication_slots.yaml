@@ -1,0 +1,6 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  slot_name::text as tag_slot_name,\n  coalesce(plugin, 'physical')::text\
+  \ as tag_plugin,\n  active,\n  case when active then 0 else 1 end as non_active_int,\n\
+  \  pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)::int8 as restart_lsn_lag_b,\n\
+  \  greatest(age(xmin), age(catalog_xmin))::int8 as xmin_age_tx\nfrom\n  pg_replication_slots"
+metrics: []

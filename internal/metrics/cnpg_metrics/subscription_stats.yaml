@@ -1,0 +1,4 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  subname::text as tag_subname,\n  apply_error_count,\n  sync_error_count\n\
+  from\n  pg_stat_subscription_stats"
+metrics: []

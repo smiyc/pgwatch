@@ -1,0 +1,22 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  retcode,\n  backup_age_seconds,\n  message\nfrom\n  get_backup_age_walg()\n"
+metrics: []
+init_sql: "CREATE EXTENSION IF NOT EXISTS plpython3u;\n\nCREATE OR REPLACE FUNCTION\
+  \ get_backup_age_walg(OUT retcode int, OUT backup_age_seconds int, OUT message text)\
+  \ AS\n$$\nimport subprocess\nretcode=1\nbackup_age_seconds=1000000\nmessage=''\n\
+  \n# get latest wal-g backup timestamp\nwalg_last_backup_cmd=\"\"\"wal-g backup-list\
+  \ --json | jq -r '.[0].time'\"\"\"\np = subprocess.run(walg_last_backup_cmd, stdout=subprocess.PIPE,\
+  \ encoding='utf-8', shell=True)\nif p.returncode != 0:\n    # plpy.notice(\"p.stdout:\
+  \ \" + str(p.stderr) + str(p.stderr))\n    return p.returncode, backup_age_seconds,\
+  \ 'Not OK. Failed on wal-g backup-list call'\n\n# plpy.notice(\"last_tz: \" + last_tz)\n\
+  last_tz=p.stdout.rstrip('\\n\\r')\n\n# get seconds since last backup from WAL-G\
+  \ timestamp in format '2020-01-22T17:50:51Z'\ntry:\n    plan = plpy.prepare(\"SELECT\
+  \ extract(epoch from now() - $1::timestamptz)::int AS backup_age_seconds;\", [\"\
+  text\"])\n    rv = plpy.execute(plan, [last_tz])\nexcept Exception as e:\n    return\
+  \ retcode, backup_age_seconds, 'Not OK. Failed to convert WAL-G backup timestamp\
+  \ to seconds'\nelse:\n    backup_age_seconds = rv[0][\"backup_age_seconds\"]\n \
+  \   return 0, backup_age_seconds, 'OK. Last backup age in seconds: %s' % backup_age_seconds\n\
+  \n$$ LANGUAGE plpython3u VOLATILE;\n\n/* contacting S3 could be laggy depending\
+  \ on location */\nALTER FUNCTION get_backup_age_walg() SET statement_timeout TO\
+  \ '30s';\n\nGRANT EXECUTE ON FUNCTION get_backup_age_walg() TO pgwatch;\n\nCOMMENT\
+  \ ON FUNCTION get_backup_age_walg() is 'created for pgwatch';"

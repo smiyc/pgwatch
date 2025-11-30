@@ -1,0 +1,21 @@
+query: "with r as (select distinct /* pgwatch_generated */\n    ci.oid::regclass::text\
+  \ as object_name\n    from pg_stats s\n    join pg_attribute a using (attname)\n\
+  \    join pg_index i on i.indkey[0] = a.attnum and i.indrelid = a.attrelid\n   \
+  \ join pg_class c on c.oid = i.indrelid\n    join pg_class ci on ci.oid = i.indexrelid\n\
+  \    where not indisprimary\n    and not indisunique\n    and indisready\n    and\
+  \ indisvalid\n    and i.indnatts = 1 /* simple 1 column indexes */\n    and null_frac\
+  \ > 0.5 /* 50% empty */\n    and not pg_get_indexdef(i.indexrelid) like '% WHERE\
+  \ %'\n    and c.reltuples >= 1e5 /* ignore smaller tables */\n    and not exists\
+  \ ( /* leave out sub-partitions */\n        select * from pg_inherits where inhrelid\
+  \ = c.oid)),\nlimited_r as (select * from r limit 25),\nrr as (select\n    (extract(epoch\
+  \ from now()) * 1e9)::int8 as epoch_ns,\n    'partial_index_candidates'::text as\
+  \ tag_reco_topic,\n    string_agg(object_name, ',') as tag_object_name,\n    'indexes\
+  \ could possibly be declared partial leaving out NULL-s'::text as recommendation,\n\
+  \    'CREATE INDEX CONCURRENTLY <index_name> ON <table_name> (<column>) WHERE <column>\
+  \ IS NOT NULL;'::text as extra_info\n    from limited_r),\nlast_reco(s) as (\n \
+  \   select case when count(*) > 25 then format(' and found %s more...', count(*)-25)\
+  \ end from r),\ntotal_count as (\n    select count(*) as total from r)\nselect \n\
+  \    epoch_ns,\n    tag_reco_topic,\n    concat(tag_object_name, s) as tag_object_name,\n\
+  \    recommendation,\n    extra_info,\n    total as total_recommendations\nfrom\
+  \ rr, last_reco, total_count\nwhere tag_object_name > '';\n"
+metrics: []

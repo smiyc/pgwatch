@@ -1,0 +1,13 @@
+query: "SELECT /* pgwatch_generated */\n    (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n    coalesce(backend_type, 'total') as tag_backend_type,\n    sum(coalesce(reads,\
+  \ 0))::int8  as reads,\n    (sum(coalesce(reads, 0) * op_bytes) / 1e6)::int8 as\
+  \ read_bytes_mb,\n    sum(coalesce(read_time, 0))::int8 as read_time_ms,\n    sum(coalesce(writes,\
+  \ 0))::int8 as writes,\n    (sum(coalesce(writes, 0) * op_bytes) / 1e6)::int8 as\
+  \ write_bytes_mb,\n    sum(coalesce(write_time, 0))::int8 as write_time_ms,\n  \
+  \  sum(coalesce(writebacks, 0))::int8 as writebacks,\n    (sum(coalesce(writebacks,\
+  \ 0) * op_bytes) / 1e6)::int8 as writeback_bytes_mb,\n    sum(coalesce(writeback_time,\
+  \ 0))::int8 as writeback_time_ms,\n    sum(coalesce(fsyncs, 0))::int8 fsyncs,\n\
+  \    sum(coalesce(fsync_time, 0))::int8 fsync_time_ms,\n    max(extract(epoch from\
+  \ now() - stats_reset)::int) as stats_reset_s\nFROM\n    pg_stat_io\nGROUP BY\n\
+  \   ROLLUP (backend_type)"
+metrics: []

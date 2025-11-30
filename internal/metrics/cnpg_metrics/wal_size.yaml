@@ -1,0 +1,4 @@
+query: "select /* pgwatch_generated */\n    (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n    sum(size)::int8 as wal_size_b,\n    count(*)::int8 as wal_file_count\n\
+  from pg_ls_waldir()"
+metrics: []

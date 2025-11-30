@@ -1,0 +1,5 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  pg_database_size(current_database()) as size_b,\n  (select sum(pg_total_relation_size(c.oid))::int8\n\
+  \   from pg_class c join pg_namespace n on n.oid = c.relnamespace\n   where nspname\
+  \ = 'pg_catalog' and relkind = 'r'\n  ) as catalog_size_b"
+metrics: []

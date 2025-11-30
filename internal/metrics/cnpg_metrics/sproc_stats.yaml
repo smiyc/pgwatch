@@ -1,0 +1,7 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  schemaname::text AS tag_schema,\n  funcname::text  AS tag_function_name,\n\
+  \  quote_ident(schemaname)||'.'||quote_ident(funcname) as tag_function_full_name,\n\
+  \  p.oid::text as tag_oid, -- for overloaded funcs\n  calls as sp_calls,\n  self_time,\n\
+  \  total_time\nFROM\n  pg_stat_user_functions f\n  JOIN\n  pg_proc p ON p.oid =\
+  \ f.funcid\nORDER BY\n  total_time DESC\nLIMIT\n  300"
+metrics: []

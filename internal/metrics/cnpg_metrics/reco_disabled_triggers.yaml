@@ -1,0 +1,14 @@
+query: "with r as (select /* pgwatch_generated */\n    c.oid::regclass::text as object_name\n\
+  \    from pg_trigger t join pg_class c on c.oid = t.tgrelid\n    where tgenabled\
+  \ = 'D'),\nlimited_r as (select * from r limit 25),\nrr as (select\n    (extract(epoch\
+  \ from now()) * 1e9)::int8 as epoch_ns,\n    'disabled_triggers'::text as tag_reco_topic,\n\
+  \    string_agg(object_name, ',') as tag_object_name,\n    'review usage of triggers\
+  \ and consider dropping them if not needed anymore'::text as recommendation,\n \
+  \   'Enable: ALTER TABLE <table_name> ENABLE TRIGGER <trigger_name>; Drop: DROP\
+  \ TRIGGER <trigger_name> ON <table_name>;'::text as extra_info\n    from limited_r),\n\
+  last_reco(s) as (\n    select case when count(*) > 25 then format(' and found %s\
+  \ more...', count(*)-25) end from r),\ntotal_count as (\n    select count(*) as\
+  \ total from r)\nselect \n    epoch_ns,\n    tag_reco_topic,\n    concat(tag_object_name,\
+  \ s) as tag_object_name,\n    recommendation,\n    extra_info,\n    total as total_recommendations\n\
+  from rr, last_reco, total_count\nwhere tag_object_name > '';\n"
+metrics: []

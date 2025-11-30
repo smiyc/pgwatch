@@ -1,0 +1,4 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  name as tag_setting,\n  coalesce(reset_val, '') as value\nfrom\n\
+  \  pg_settings\nwhere\n  name <> 'connection_ID'"
+metrics: []

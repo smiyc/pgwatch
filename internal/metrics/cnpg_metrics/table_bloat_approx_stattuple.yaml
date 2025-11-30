@@ -1,0 +1,11 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  quote_ident(n.nspname)||'.'||quote_ident(c.relname) as tag_full_table_name,\n\
+  \  approx_free_percent,\n  approx_free_space as approx_free_space_b,\n  approx_tuple_count,\n\
+  \  dead_tuple_percent,\n  dead_tuple_len as dead_tuple_len_b\nfrom\n  pg_class c\n\
+  \  join lateral pgstattuple_approx(c.oid) st on (c.oid not in (select relation from\
+  \ pg_locks where mode = 'AccessExclusiveLock'))  -- skip locked tables,\n  join\
+  \ pg_namespace n on n.oid = c.relnamespace\nwhere\n  relkind in ('r', 'm')\n  and\
+  \ c.relpages >= 128 -- tables > 1mb\n  and not n.nspname like any (array[E'pg\\\\\
+  _%', 'information_schema'])"
+metrics: []
+init_sql: create extension if not exists pgstattuple;

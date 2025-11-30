@@ -1,0 +1,5 @@
+query: "select /* pgwatch_generated */\n   (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n   checkpoints_timed,\n   checkpoints_req,\n   checkpoint_write_time,\n\
+  \   checkpoint_sync_time,\n   buffers_checkpoint,\n   buffers_clean,\n   maxwritten_clean,\n\
+  \   buffers_backend,\n   buffers_backend_fsync,\n   buffers_alloc\n from\n   pg_stat_bgwriter"
+metrics: []

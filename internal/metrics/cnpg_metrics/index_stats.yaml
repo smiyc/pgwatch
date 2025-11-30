@@ -1,0 +1,41 @@
+query: "/* does not return all index stats but biggest, top scanned and biggest unused\
+  \ ones */\nWITH q_locked_rels AS (\n  select relation from pg_locks where mode =\
+  \ 'AccessExclusiveLock'\n),\nq_index_details AS (\n  select\n    sui.schemaname,\n\
+  \    sui.indexrelname,\n    sui.relname,\n    sui.indexrelid,\n    coalesce(pg_relation_size(sui.indexrelid),\
+  \ 0) as index_size_b,\n    sui.idx_scan,\n    sui.idx_tup_read,\n    sui.idx_tup_fetch,\n\
+  \    io.idx_blks_read,\n    io.idx_blks_hit,\n    i.indisvalid,\n    i.indisprimary,\n\
+  \    i.indisunique,\n    i.indisexclusion\n  from\n    pg_stat_user_indexes sui\n\
+  \    join pg_statio_user_indexes io on io.indexrelid = sui.indexrelid\n    join\
+  \ pg_index i on i.indexrelid = sui.indexrelid\n  where not sui.schemaname like any\
+  \ (array [E'pg\\\\_temp%', E'\\\\_timescaledb%'])\n  and not exists (select * from\
+  \ q_locked_rels where relation = sui.relid or relation = sui.indexrelid)\n),\nq_top_indexes\
+  \ AS (\n    /* biggest */\n    select *\n    from (\n             select indexrelid\n\
+  \             from q_index_details\n             where idx_scan > 1\n          \
+  \   order by index_size_b desc\n             limit 200\n         ) x\n    union\n\
+  \    /* most block traffic */\n    select *\n    from (\n             select indexrelid\n\
+  \             from q_index_details\n             order by coalesce(idx_blks_read,\
+  \ 0) + coalesce(idx_blks_hit, 0) desc\n             limit 200\n         ) y\n  \
+  \  union\n    /* most scans */\n    select *\n    from (\n             select indexrelid\n\
+  \             from q_index_details\n             order by idx_scan desc nulls last\n\
+  \             limit 200\n         ) z\n    union\n    /* biggest unused non-constraint\
+  \ */\n    select *\n    from (\n             select q.indexrelid\n             from\
+  \ q_index_details q\n             where idx_scan = 0\n             and not (indisprimary\
+  \ or indisunique or indisexclusion)\n             order by index_size_b desc\n \
+  \            limit 200\n         ) z\n    union\n    /* all invalid */\n    select\
+  \ *\n    from (\n             select q.indexrelid\n             from q_index_details\
+  \ q\n             where not indisvalid\n         ) zz\n)\nselect /* pgwatch_generated\
+  \ */\n  (extract(epoch from now()) * 1e9)::int8 as epoch_ns,\n  schemaname::text\
+  \ as tag_schema,\n  indexrelname::text as tag_index_name,\n  quote_ident(schemaname)||'.'||quote_ident(indexrelname)\
+  \ as tag_index_full_name,\n  relname::text as tag_table_name,\n  quote_ident(schemaname)||'.'||quote_ident(relname)\
+  \ as tag_table_full_name,\n  coalesce(idx_scan, 0) as idx_scan,\n  coalesce(idx_tup_read,\
+  \ 0) as idx_tup_read,\n  coalesce(idx_tup_fetch, 0) as idx_tup_fetch,\n  coalesce(index_size_b,\
+  \ 0) as index_size_b,\n  quote_ident(schemaname)||'.'||quote_ident(indexrelname)\
+  \ as index_full_name_val,\n  md5(regexp_replace(regexp_replace(pg_get_indexdef(indexrelid),indexrelname,'X'),\
+  \ '^CREATE UNIQUE','CREATE')) as tag_index_def_hash,\n  regexp_replace(regexp_replace(pg_get_indexdef(indexrelid),indexrelname,'X'),\
+  \ '^CREATE UNIQUE','CREATE') as index_def,\n  case when not indisvalid then 1 else\
+  \ 0 end as is_invalid_int,\n  case when indisprimary then 1 else 0 end as is_pk_int,\n\
+  \  case when indisunique or indisexclusion then 1 else 0 end as is_uq_or_exc,\n\
+  \  system_identifier::text as tag_sys_id\nFROM\n  q_index_details id\n  JOIN\n \
+  \ pg_control_system() ON true\nWHERE\n  indexrelid IN (select indexrelid from q_top_indexes)\n\
+  ORDER BY\n  id.schemaname, id.relname, id.indexrelname"
+metrics: []

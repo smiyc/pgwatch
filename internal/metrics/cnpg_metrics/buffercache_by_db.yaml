@@ -1,0 +1,6 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  datname as tag_database,\n  count(*) * (current_setting('block_size')::int8)\
+  \ as size_b\nFROM\n  pg_buffercache AS b,\n  pg_database AS d\nWHERE\n  d.oid =\
+  \ b.reldatabase\nGROUP BY\n  datname"
+metrics: []
+init_sql: create extension if not exists pg_buffercache;

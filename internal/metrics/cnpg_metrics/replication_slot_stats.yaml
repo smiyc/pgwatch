@@ -1,0 +1,5 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  slot_name::text as tag_slot_name,\n  spill_txns,\n  spill_count,\n\
+  \  spill_bytes,\n  stream_txns,\n  stream_count,\n  stream_bytes,\n  total_txns,\n\
+  \  total_bytes\nfrom\n  pg_stat_replication_slots"
+metrics: []

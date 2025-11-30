@@ -1,0 +1,11 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  archived_count,\n  failed_count,\n  case when coalesce(last_failed_time,\
+  \ '1970-01-01'::timestamptz) > coalesce(last_archived_time, '1970-01-01'::timestamptz)\
+  \ then 1 else 0 end as is_failing_int,\n  extract(epoch from now() - last_failed_time)::int8\
+  \ as seconds_since_last_failure\nfrom\n  pg_stat_archiver\nwhere\n  current_setting('archive_mode')\
+  \ in ('on', 'always')"
+metrics:
+- name: is_failing_int
+  type: gauge
+- name: seconds_since_last_failure
+  type: gauge

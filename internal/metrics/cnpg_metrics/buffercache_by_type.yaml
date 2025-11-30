@@ -1,0 +1,8 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  CASE\n    WHEN relkind = 'r' THEN 'Table'   -- TODO all relkinds\
+  \ covered?\n    WHEN relkind = 'i' THEN 'Index'\n    WHEN relkind = 't' THEN 'Toast'\n\
+  \    WHEN relkind = 'm' THEN 'Materialized view'\n    ELSE 'Other'\n  END as tag_relkind,\n\
+  \  count(*) * (current_setting('block_size')::int8) size_b\nFROM\n  pg_buffercache\
+  \ AS b,\n  pg_class AS d\nWHERE\n  d.oid = b.relfilenode\nGROUP BY\n  relkind"
+metrics: []
+init_sql: 'create extension if not exists pg_buffercache;            '

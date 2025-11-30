@@ -1,0 +1,19 @@
+query: "WITH sa_snapshot AS (\n  select * from pg_stat_activity\n  where datname =\
+  \ current_database()\n  and not query like 'autovacuum:%'\n  and pid != pg_backend_pid()\n\
+  )\nselect /* pgwatch_generated */\n    (extract(epoch from now()) * 1e9)::int8 AS\
+  \ epoch_ns,\n    waiting.locktype           AS tag_waiting_locktype,\n    waiting_stm.usename::text\
+  \  AS tag_waiting_user,\n    coalesce(waiting.mode, 'null'::text) AS tag_waiting_mode,\n\
+  \    coalesce(waiting.relation::regclass::text, 'null') AS tag_waiting_table,\n\
+  \    waiting_stm.query          AS waiting_query,\n    waiting.pid             \
+  \   AS waiting_pid,\n    other.locktype             AS other_locktype,\n    other.relation::regclass::text\
+  \   AS other_table,\n    other_stm.query            AS other_query,\n    other.mode\
+  \                 AS other_mode,\n    other.pid                  AS other_pid,\n\
+  \    other_stm.usename::text    AS other_user\nFROM\n    pg_catalog.pg_locks AS\
+  \ waiting\nJOIN\n    sa_snapshot AS waiting_stm\n    ON (\n        waiting_stm.pid\
+  \ = waiting.pid\n    )\nJOIN\n    pg_catalog.pg_locks AS other\n    ON (\n     \
+  \   (\n            waiting.\"database\" = other.\"database\"\n        AND waiting.relation\
+  \  = other.relation\n        )\n        OR waiting.transactionid = other.transactionid\n\
+  \    )\nJOIN\n    sa_snapshot AS other_stm\n    ON (\n        other_stm.pid = other.pid\n\
+  \    )\nWHERE\n    NOT waiting.GRANTED\nAND\n    waiting.pid <> other.pid\nAND\n\
+  \    other.GRANTED\nAND\n    waiting_stm.datname = current_database()"
+metrics: []

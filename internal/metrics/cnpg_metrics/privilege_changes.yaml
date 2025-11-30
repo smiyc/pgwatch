@@ -1,0 +1,68 @@
+query: "select /* pgwatch_generated */\n    (extract(epoch FROM now()) * 1e9)::int8\
+  \ AS epoch_ns,\n    *\nFROM (\n    SELECT\n        'table'::text AS object_type,\n\
+  \        grantee::text AS tag_role,\n        quote_ident(table_schema) || '.' ||\
+  \ quote_ident(table_name) AS tag_object,\n        privilege_type\n    FROM\n   \
+  \     information_schema.table_privileges\n        /* includes also VIEW-s actually\
+  \ */\n    WHERE\n        NOT grantee = ANY (\n            SELECT\n             \
+  \   rolname\n            FROM\n                pg_roles\n            WHERE\n   \
+  \             rolsuper\n                OR oid < 16384)\n            AND NOT table_schema\
+  \ IN ('information_schema', 'pg_catalog')\n            /*\n             union all\n\
+  \n             select\n             -- quite a heavy query currently, maybe faster\
+  \ directly via pg_attribute + has_column_privilege?\n            'column' AS object_type,\n\
+  \            grantee::text AS tag_role,\n            quote_ident(table_schema) ||\
+  \ '.' || quote_ident(table_name) AS tag_object,\n            privilege_type\n  \
+  \      FROM\n            information_schema.column_privileges cp\n        WHERE\n\
+  \            NOT table_schema IN ('pg_catalog', 'information_schema')\n        \
+  \    AND NOT grantee = ANY (\n                SELECT\n                    rolname\n\
+  \                FROM\n                    pg_roles\n                WHERE\n   \
+  \                 rolsuper\n                    OR oid < 16384)\n              \
+  \  AND NOT EXISTS (\n                    SELECT\n                        *\n   \
+  \                 FROM\n                        information_schema.table_privileges\n\
+  \                    WHERE\n                        table_schema = cp.table_schema\n\
+  \                        AND table_name = cp.table_name\n                      \
+  \  AND grantee = cp.grantee\n                        AND privilege_type = cp.privilege_type)\
+  \ */\n                UNION ALL\n                SELECT\n                    'function'\
+  \ AS object_type,\n                    grantee::text AS tag_role,\n            \
+  \        quote_ident(routine_schema) || '.' || quote_ident(routine_name) AS tag_object,\n\
+  \                    privilege_type\n                FROM\n                    information_schema.routine_privileges\n\
+  \                WHERE\n                    NOT routine_schema IN ('information_schema',\
+  \ 'pg_catalog')\n                    AND NOT grantee = ANY (\n                 \
+  \       SELECT\n                            rolname\n                        FROM\n\
+  \                            pg_roles\n                        WHERE\n         \
+  \                   rolsuper\n                            OR oid < 16384)\n    \
+  \                UNION ALL\n                    SELECT\n                       \
+  \ 'schema' AS object_type,\n                        r.rolname::text AS tag_role,\n\
+  \                        quote_ident(n.nspname) AS tag_object,\n               \
+  \         p.perm AS privilege_type\n                    FROM\n                 \
+  \       pg_catalog.pg_namespace AS n\n                    CROSS JOIN pg_catalog.pg_roles\
+  \ AS r\n                    CROSS JOIN (\n                        VALUES ('USAGE'),\n\
+  \                            ('CREATE')) AS p (perm)\n                    WHERE\n\
+  \                        NOT n.nspname IN ('information_schema', 'pg_catalog')\n\
+  \                            AND n.nspname NOT LIKE 'pg_%'\n                   \
+  \         AND NOT r.rolsuper\n                            AND r.oid >= 16384\n \
+  \                           AND has_schema_privilege(r.oid, n.oid, p.perm)\n   \
+  \                     UNION ALL\n                        SELECT\n              \
+  \              'database' AS object_type,\n                            r.rolname::text\
+  \ AS role_name,\n                            quote_ident(datname) AS tag_object,\n\
+  \                            p.perm AS permission\n                        FROM\n\
+  \                            pg_catalog.pg_database AS d\n                     \
+  \   CROSS JOIN pg_catalog.pg_roles AS r\n                        CROSS JOIN (\n\
+  \                            VALUES ('CREATE'),\n                              \
+  \  ('CONNECT'),\n                                ('TEMPORARY')) AS p (perm)\n  \
+  \                      WHERE\n                            d.datname = current_database()\n\
+  \                                AND NOT r.rolsuper\n                          \
+  \      AND r.oid >= 16384\n                                AND has_database_privilege(r.oid,\
+  \ d.oid, p.perm)\n                            UNION ALL\n                      \
+  \      SELECT\n                                'superusers' AS object_type,\n  \
+  \                              rolname::text AS role_name,\n                   \
+  \             rolname::text AS tag_object,\n                                'SUPERUSER'\
+  \ AS permission\n                            FROM\n                            \
+  \    pg_catalog.pg_roles\n                            WHERE\n                  \
+  \              rolsuper\n                            UNION ALL\n               \
+  \             SELECT\n                                'login_users' AS object_type,\n\
+  \                                rolname::text AS role_name,\n                 \
+  \               rolname::text AS tag_object,\n                                'LOGIN'\
+  \ AS permission\n                            FROM\n                            \
+  \    pg_catalog.pg_roles\n                            WHERE\n                  \
+  \              rolcanlogin) y"
+metrics: []

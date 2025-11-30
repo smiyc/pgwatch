@@ -1,0 +1,10 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  case\n    when pg_is_in_recovery() = false then\n      pg_wal_lsn_diff(pg_current_wal_lsn(),\
+  \ '0/0')::int8\n    else\n      pg_wal_lsn_diff(pg_last_wal_replay_lsn(), '0/0')::int8\n\
+  \    end as xlog_location_b,\n  case when pg_is_in_recovery() then 1 else 0 end\
+  \ as in_recovery_int,\n  extract(epoch from (now() - pg_postmaster_start_time()))::int8\
+  \ as postmaster_uptime_s,\n  system_identifier::text as tag_sys_id,\n  case\n  \
+  \  when pg_is_in_recovery() = false then\n      ('x'||substr(pg_walfile_name(pg_current_wal_lsn()),\
+  \ 1, 8))::bit(32)::int\n    else\n      (select min_recovery_end_timeline::int from\
+  \ pg_control_recovery())\n    end as timeline\nfrom pg_control_system()"
+metrics: []

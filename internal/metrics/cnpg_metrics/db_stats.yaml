@@ -1,0 +1,28 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  numbackends,\n  xact_commit,\n  xact_rollback,\n  blks_read,\n\
+  \  blks_hit,\n  tup_returned,\n  tup_fetched,\n  tup_inserted,\n  tup_updated,\n\
+  \  tup_deleted,\n  conflicts,\n  temp_files,\n  temp_bytes,\n  deadlocks,\n  blk_read_time,\n\
+  \  blk_write_time,\n  extract(epoch from (now() - pg_postmaster_start_time()))::int8\
+  \ as postmaster_uptime_s,\n  extract(epoch from (now() - pg_backup_start_time()))::int8\
+  \ as backup_duration_s,\n  case when pg_is_in_recovery() then 1 else 0 end as in_recovery_int,\n\
+  \  system_identifier::text as tag_sys_id,\n  (select count(*) from pg_index i\n\
+  \    where not indisvalid\n    and not exists ( /* leave out ones that are being\
+  \ actively rebuilt */\n      select * from pg_locks l\n      join pg_stat_activity\
+  \ a using (pid)\n      where l.relation = i.indexrelid\n      and a.state = 'active'\n\
+  \      and a.query ~* 'concurrently'\n  )) as invalid_indexes\nfrom\n  pg_stat_database,\
+  \ pg_control_system()\nwhere\n  datname = current_database()"
+metrics:
+- name: numbackends
+  type: gauge
+- name: postmaster_uptime_s
+  type: gauge
+- name: backup_duration_s
+  type: gauge
+- name: backup_duration_s
+  type: gauge
+- name: checksum_last_failure_s
+  type: gauge
+- name: parallel_workers_to_launch
+  type: gauge
+- name: parallel_workers_launched
+  type: gauge

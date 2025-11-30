@@ -1,0 +1,13 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  total, used, free, buff_cache, available, percent,\n  swap_total,\
+  \ swap_used, swap_free, swap_percent\nfrom\n  get_psutil_mem()\n"
+metrics: []
+init_sql: "CREATE EXTENSION IF NOT EXISTS plpython3u;\n\nCREATE OR REPLACE FUNCTION\
+  \ get_psutil_mem(\n\tOUT total float8, OUT used float8, OUT free float8, OUT buff_cache\
+  \ float8, OUT available float8, OUT percent float8,\n\tOUT swap_total float8, OUT\
+  \ swap_used float8, OUT swap_free float8, OUT swap_percent float8\n)\n LANGUAGE\
+  \ plpython3u\nAS $FUNCTION$\nfrom psutil import virtual_memory, swap_memory\nvm\
+  \ = virtual_memory()\nsw = swap_memory()\nreturn vm.total, vm.used, vm.free, vm.buffers\
+  \ + vm.cached, vm.available, vm.percent, sw.total, sw.used, sw.free, sw.percent\n\
+  $FUNCTION$;\n\nGRANT EXECUTE ON FUNCTION get_psutil_mem() TO pgwatch;\nCOMMENT ON\
+  \ FUNCTION get_psutil_mem() IS 'created for pgwatch';"

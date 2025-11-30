@@ -1,0 +1,44 @@
+query: "WITH q_data AS (\n    SELECT\n        coalesce(queryid::text, 'insufficient-privileges-total')\
+  \ as tag_queryid,\n        /*\n         if security conscious about exposing query\
+  \ texts replace the below expression with a dash ('-') OR\n         use the stat_statements_no_query_text\
+  \ metric instead, created specifically for this use case.\n         */\n       \
+  \ array_to_string(array_agg(DISTINCT quote_ident(pg_get_userbyid(userid))), ',')\
+  \ AS users,\n        sum(s.calls)::int8 AS calls,\n        round(sum(s.total_time)::numeric,\
+  \ 3)::double precision AS total_time,\n        sum(s.rows)::int8 AS rows,\n    \
+  \    sum(shared_blks_hit)::int8 AS shared_blks_hit,\n        sum(shared_blks_read)::int8\
+  \ AS shared_blks_read,\n        sum(shared_blks_written)::int8 AS shared_blks_written,\n\
+  \        sum(shared_blks_dirtied)::int8 AS shared_blks_dirtied,\n        sum(temp_blks_read)::int8\
+  \ AS temp_blks_read,\n        sum(temp_blks_written)::int8 AS temp_blks_written,\n\
+  \        round(sum(blk_read_time)::numeric, 3)::double precision AS blk_read_time,\n\
+  \        round(sum(blk_write_time)::numeric, 3)::double precision AS blk_write_time,\n\
+  \        max(query::varchar(8000)) AS query\n    FROM\n        pg_stat_statements\
+  \ s\n    WHERE\n        calls > 5\n        AND total_time > 5\n        AND dbid\
+  \ = (\n            SELECT\n                oid\n            FROM\n             \
+  \   pg_database\n            WHERE\n                datname = current_database())\n\
+  \            AND NOT upper(s.query::varchar(50))\n            LIKE ANY (ARRAY['DEALLOCATE%',\n\
+  \                'SET %',\n                'RESET %',\n                'BEGIN%',\n\
+  \                'BEGIN;',\n                'COMMIT%',\n                'END%',\n\
+  \                'ROLLBACK%',\n                'SHOW%'])\n        GROUP BY\n   \
+  \         queryid\n)\nSELECT (EXTRACT(epoch FROM now()) * 1e9)::int8 AS epoch_ns,\n\
+  \       b.tag_queryid,\n       b.users,\n       b.calls,\n       b.total_time,\n\
+  \       b.rows,\n       b.shared_blks_hit,\n       b.shared_blks_read,\n       b.shared_blks_written,\n\
+  \       b.shared_blks_dirtied,\n       b.temp_blks_read,\n       b.temp_blks_written,\n\
+  \       b.blk_read_time,\n       b.blk_write_time,\n       ltrim(regexp_replace(b.query,\
+  \ E'[ \\\\t\\\\n\\\\r]+', ' ', 'g')) tag_query\nFROM (\n    SELECT\n        *\n\
+  \    FROM (\n        SELECT\n            *\n        FROM\n            q_data\n \
+  \       WHERE\n            total_time > 0\n        ORDER BY\n            total_time\
+  \ DESC\n        LIMIT 100) a\nUNION\nselect /* pgwatch_generated */\n    *\nFROM\
+  \ (\n    SELECT\n        *\n    FROM\n        q_data\n    ORDER BY\n        calls\
+  \ DESC\n    LIMIT 100) a\nUNION\nselect /* pgwatch_generated */\n    *\nFROM (\n\
+  \    SELECT\n        *\n    FROM\n        q_data\n    WHERE\n        shared_blks_read\
+  \ > 0\n    ORDER BY\n        shared_blks_read DESC\n    LIMIT 100) a\nUNION\nselect\
+  \ /* pgwatch_generated */\n    *\nFROM (\n    SELECT\n        *\n    FROM\n    \
+  \    q_data\n    WHERE\n        shared_blks_written > 0\n    ORDER BY\n        shared_blks_written\
+  \ DESC\n    LIMIT 100) a\nUNION\nselect /* pgwatch_generated */\n    *\nFROM (\n\
+  \    SELECT\n        *\n    FROM\n        q_data\n    WHERE\n        temp_blks_read\
+  \ > 0\n    ORDER BY\n        temp_blks_read DESC\n    LIMIT 100) a\nUNION\nselect\
+  \ /* pgwatch_generated */\n    *\nFROM (\n    SELECT\n        *\n    FROM\n    \
+  \    q_data\n    WHERE\n        temp_blks_written > 0\n    ORDER BY\n        temp_blks_written\
+  \ DESC\n    LIMIT 100) a) b"
+metrics: []
+init_sql: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;

@@ -1,0 +1,31 @@
+query: "WITH RECURSIVE views AS (\n   -- get the directly depending views\n   SELECT\
+  \ v.oid::regclass AS view,\n          format('%s.%s', quote_ident(n.nspname), quote_ident(v.relname))\
+  \ as full_name,\n          1 AS level\n   FROM pg_depend AS d\n      JOIN pg_rewrite\
+  \ AS r\n         ON r.oid = d.objid\n      JOIN pg_class AS v\n         ON v.oid\
+  \ = r.ev_class\n      JOIN pg_namespace AS n\n         ON n.oid = v.relnamespace\n\
+  \   WHERE v.relkind = 'v'\n     AND NOT n.nspname = ANY(array['information_schema',\
+  \ E'pg\\\\_%'])\n     AND NOT v.relname LIKE E'pg\\\\_%'\n     AND d.classid = 'pg_rewrite'::regclass\n\
+  \     AND d.refclassid = 'pg_class'::regclass\n     AND d.deptype = 'n'\nUNION ALL\n\
+  \   -- add the views that depend on these\n   SELECT v.oid::regclass,\n        \
+  \  format('%s.%s', quote_ident(n.nspname), quote_ident(v.relname)) as full_name,\n\
+  \          views.level + 1\n   FROM views\n      JOIN pg_depend AS d\n         ON\
+  \ d.refobjid = views.view\n      JOIN pg_rewrite AS r\n         ON r.oid = d.objid\n\
+  \      JOIN pg_class AS v\n         ON v.oid = r.ev_class\n      JOIN pg_namespace\
+  \ AS n\n         ON n.oid = v.relnamespace\n   WHERE v.relkind = 'v'\n     AND NOT\
+  \ n.nspname = ANY(array['information_schema', E'pg\\\\_%'])\n     AND d.classid\
+  \ = 'pg_rewrite'::regclass\n     AND d.refclassid = 'pg_class'::regclass\n     AND\
+  \ d.deptype = 'n'\n     AND v.oid <> views.view  -- avoid loop\n),\nnested_views\
+  \ AS (\n    SELECT full_name::text as object_name,\n           max(level) as max_level\n\
+  \    FROM views\n    GROUP BY full_name\n    HAVING max(level) > 3\n),\nr as (select\
+  \ /* pgwatch_generated */\n    object_name\n    from nested_views),\nlimited_r as\
+  \ (select * from r limit 25),\nrr as (select\n    (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n    'overly_nested_views'::text as tag_reco_topic,\n    string_agg(object_name,\
+  \ ',') as tag_object_name,\n    'overly nested views can affect performance'::text\
+  \ as recommendation,\n    'Consider flattening views by creating materialized views\
+  \ or combining view logic to reduce dependency depth'::text as extra_info\n    from\
+  \ limited_r),\nlast_reco(s) as (\n    select case when count(*) > 25 then format('\
+  \ and found %s more...', count(*)-25) end from r),\ntotal_count as (\n    select\
+  \ count(*) as total from r)\nselect \n    epoch_ns,\n    tag_reco_topic,\n    concat(tag_object_name,\
+  \ s) as tag_object_name,\n    recommendation,\n    extra_info,\n    total as total_recommendations\n\
+  from rr, last_reco, total_count\nwhere tag_object_name > '';"
+metrics: []

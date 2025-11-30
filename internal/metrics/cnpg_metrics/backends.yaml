@@ -1,0 +1,39 @@
+query: "with sa_snapshot as (\n  select * from pg_stat_activity\n  where pid != pg_backend_pid()\n\
+  \  and datname = current_database()\n)\nselect /* pgwatch_generated */\n  (extract(epoch\
+  \ from now()) * 1e9)::int8 as epoch_ns,\n  (select count(*) from sa_snapshot where\
+  \ backend_type = 'client backend') as total,\n  (select count(*) from pg_stat_activity\
+  \ where pid != pg_backend_pid()) as instance_total,\n  current_setting('max_connections')::int\
+  \ as max_connections,\n  (select count(*) from sa_snapshot where backend_type =\
+  \ 'background worker') as background_workers,\n  (select count(*) from sa_snapshot\
+  \ where state = 'active' and backend_type = 'client backend') as active,\n  (select\
+  \ count(*) from sa_snapshot where state = 'idle' and backend_type = 'client backend')\
+  \ as idle,\n  (select count(*) from sa_snapshot where state = 'idle in transaction'\
+  \ and backend_type = 'client backend') as idleintransaction,\n  (select count(*)\
+  \ from sa_snapshot where wait_event_type in ('LWLock', 'Lock', 'BufferPin') and\
+  \ backend_type = 'client backend') as waiting,\n  (select coalesce(sum(case when\
+  \ coalesce(array_length(pg_blocking_pids(pid), 1), 0) >= 1 then 1 else 0 end), 0)\
+  \ from sa_snapshot where backend_type = 'client backend' and state = 'active') as\
+  \ blocked,\n  (select ceil(extract(epoch from max(now() - query_start)))::int from\
+  \ sa_snapshot where wait_event_type in ('LWLock', 'Lock', 'BufferPin') and backend_type\
+  \ = 'client backend') as longest_waiting_seconds,\n  (select round(avg(abs(extract(epoch\
+  \ from now() - query_start)))::numeric, 3)::float from sa_snapshot where wait_event_type\
+  \ in ('LWLock', 'Lock', 'BufferPin') and backend_type = 'client backend') as avg_waiting_seconds,\n\
+  \  (select ceil(extract(epoch from (now() - backend_start)))::int from sa_snapshot\
+  \ where backend_type = 'client backend' order by backend_start limit 1) as longest_session_seconds,\n\
+  \  (select round(avg(abs(extract(epoch from now() - backend_start)))::numeric, 3)::float\
+  \ from sa_snapshot where backend_type = 'client backend') as avg_session_seconds,\n\
+  \  (select ceil(extract(epoch from (now() - xact_start)))::int from sa_snapshot\
+  \ where xact_start is not null and backend_type = 'client backend' order by xact_start\
+  \ limit 1) as longest_tx_seconds,\n  (select round(avg(abs(extract(epoch from now()\
+  \ - xact_start)))::numeric, 3)::float from sa_snapshot where xact_start is not null\
+  \ and backend_type = 'client backend') as avg_tx_seconds,\n  (select ceil(extract(epoch\
+  \ from (now() - xact_start)))::int from sa_snapshot where backend_type = 'autovacuum\
+  \ worker' order by xact_start limit 1) as longest_autovacuum_seconds,\n  (select\
+  \ ceil(extract(epoch from max(now() - query_start)))::int from sa_snapshot where\
+  \ state = 'active' and backend_type = 'client backend') as longest_query_seconds,\n\
+  \  (select round(avg(abs(extract(epoch from now() - query_start)))::numeric, 3)::float\
+  \ from sa_snapshot where state = 'active' and backend_type = 'client backend') as\
+  \ avg_query_seconds,\n  (select max(age(backend_xmin))::int8 from sa_snapshot) as\
+  \ max_xmin_age_tx,\n  (select count(*) from sa_snapshot where state = 'active' and\
+  \ backend_type = 'autovacuum worker') as av_workers\n"
+metrics: []

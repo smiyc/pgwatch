@@ -1,0 +1,17 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  device as tag_device,\n  retcode\nfrom\n  get_smart_health_per_device()"
+metrics: []
+init_sql: "CREATE EXTENSION IF NOT EXISTS plpython3u;\n\nCREATE OR REPLACE FUNCTION\
+  \ get_smart_health_per_device(OUT device text, OUT retcode int) RETURNS SETOF record\
+  \ AS\n$$\nimport subprocess\nret_list = []\n\n#disk_detect_cmd='smartctl --scan\
+  \ | cut -d \" \" -f3 | grep mega' # for Lenovo ServerRAID M1210\ndisk_detect_cmd='lsblk\
+  \ -io KNAME,TYPE | grep '' disk'' | cut -d \" \" -f1 | sort'\np = subprocess.run(disk_detect_cmd,\
+  \ stdout=subprocess.PIPE, encoding='utf-8', shell=True)\nif p.returncode != 0:\n\
+  \    return ret_list\ndisks = p.stdout.splitlines()\n\nfor disk in disks:\n    #\
+  \ health_cmd = 'smartctl -d $disk -a -q silent /dev/sda' % disk    # for Lenovo\
+  \ ServerRAID M1210 members\n    health_cmd = 'smartctl  -a -q silent /dev/%s' %\
+  \ disk\n    p = subprocess.run(health_cmd, stdout=subprocess.PIPE, encoding='utf-8',\
+  \ shell=True)\n    ret_list.append((disk, p.returncode))\n\nreturn ret_list\n\n\
+  $$ LANGUAGE plpython3u VOLATILE;\n\nGRANT EXECUTE ON FUNCTION get_smart_health_per_device()\
+  \ TO pgwatch;\n\nCOMMENT ON FUNCTION get_smart_health_per_device() is 'created for\
+  \ pgwatch';"

@@ -1,0 +1,6 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  count(*) as total,\n  count(*) FILTER (WHERE ssl) as \"on\",\n\
+  \  count(*) FILTER (WHERE NOT ssl) as \"off\"\nFROM\n  pg_stat_ssl AS s,\n  pg_stat_activity\
+  \ AS a\nWHERE\n  a.pid = s.pid\n  AND a.datname = current_database()\n  AND a.pid\
+  \ <> pg_backend_pid()\n  AND NOT (a.client_addr = '127.0.0.1' OR client_port = -1)\n"
+metrics: []

@@ -1,0 +1,10 @@
+query: "with q_sa as (\n    select * from pg_stat_activity where datname = current_database()\
+  \ and pid <> pg_backend_pid()\n)\nselect /* pgwatch_generated */\n  (extract(epoch\
+  \ from now()) * 1e9)::int8 as epoch_ns,\n  wait_event_type as tag_wait_event_type,\n\
+  \  wait_event as tag_wait_event,\n  count(*),\n  avg(abs(1e6* extract(epoch from\
+  \ now() - query_start)))::int8 as avg_query_duration_us,\n  max(abs(1e6* extract(epoch\
+  \ from now() - query_start)))::int8 as max_query_duration_us,\n  (select count(*)\
+  \ from q_sa where state = 'active') as total_active\nfrom\n  q_sa\nwhere\n  state\
+  \ = 'active'\n  and wait_event_type is not null\n  and wait_event_type <> 'Timeout'\n\
+  group by\n  1, 2, 3"
+metrics: []

@@ -1,0 +1,4 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  count(*) as archiver_pending_count\nfrom \n  pg_ls_archive_statusdir()\
+  \ a \nwhere\n  name ~ '[0-9A-F]{24}.ready';"
+metrics: []

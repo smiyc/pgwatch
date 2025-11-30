@@ -1,0 +1,5 @@
+query: "select /* pgwatch_generated */\n    (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n    wal_records,\n    wal_fpi,\n    (wal_bytes / 1024)::int8 as\
+  \ wal_bytes_kb,\n    wal_buffers_full,\n    wal_write,\n    wal_sync,\n    wal_write_time::int8,\n\
+  \    wal_sync_time::int8\nfrom\n    pg_stat_wal"
+metrics: []

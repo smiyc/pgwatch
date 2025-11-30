@@ -1,0 +1,6 @@
+query: "select /* pgwatch_generated */\n  (extract(epoch from now()) * 1e9)::int8\
+  \ as epoch_ns,\n  s.query as query,\n  count(*) as count\nfrom pg_stat_activity\
+  \ s\nwhere s.datname = current_database()\n  and s.state = 'active'\n  and s.backend_type\
+  \ = 'client backend'\n  and s.pid != pg_backend_pid()\n  and now() - s.query_start\
+  \ > '100ms'::interval\ngroup by s.query"
+metrics: []
