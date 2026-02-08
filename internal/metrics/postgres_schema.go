@@ -5,8 +5,8 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/db"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/db"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
 	migrator "github.com/cybertec-postgresql/pgx-migrator"
 	"github.com/jackc/pgx/v5"
 )
@@ -63,6 +63,9 @@ func (dmrw *dbMetricReaderWriter) NeedsMigration() (bool, error) {
 	}
 	return m.NeedUpgrade(dmrw.ctx, dmrw.configDb)
 }
+
+// MigrationsCount is the total number of migrations in pgwatch.migration table
+const MigrationsCount = 2
 
 // migrations holds function returning all updgrade migrations needed
 var migrations func() migrator.Option = func() migrator.Option {

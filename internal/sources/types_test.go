@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sources"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sources"
 )
 
 var ctx = log.WithLogger(context.Background(), log.NewNoopLogger())
@@ -29,26 +29,6 @@ func TestKind_IsValid(t *testing.T) {
 		got := tt.kind.IsValid()
 		assert.True(t, got == tt.expected, "IsValid(%v) = %v, want %v", tt.kind, got, tt.expected)
 	}
-}
-
-func TestSource_IsDefaultGroup(t *testing.T) {
-	sources := sources.Sources{
-		{
-			Name:  "test_source",
-			Group: "default",
-		},
-		{
-			Name:  "test_source3",
-			Group: "",
-		},
-		{
-			Name:  "test_source2",
-			Group: "custom_group",
-		},
-	}
-	assert.True(t, sources[0].IsDefaultGroup())
-	assert.True(t, sources[1].IsDefaultGroup())
-	assert.False(t, sources[2].IsDefaultGroup())
 }
 
 func TestSource_Equal(t *testing.T) {

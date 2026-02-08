@@ -8,39 +8,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/db"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/metrics"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sinks"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sources"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sinks"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sources"
 	"github.com/jackc/pgx/v5"
 )
 
 func QueryMeasurements(ctx context.Context, md *sources.SourceConn, sql string, args ...any) (metrics.Measurements, error) {
-	var conn db.PgxIface
-	var err error
-	var tx pgx.Tx
 	if strings.TrimSpace(sql) == "" {
 		return nil, errors.New("empty SQL")
 	}
 
-	conn = md.Conn
-	if md.IsPostgresSource() {
-		// we don't want transaction for non-postgres sources, e.g. pgbouncer
-		if tx, err = conn.Begin(ctx); err != nil {
-			return nil, err
-		}
-		defer func() { _ = tx.Commit(ctx) }()
-		_, err = tx.Exec(ctx, "SET LOCAL lock_timeout TO '100ms'")
-		if err != nil {
-			return nil, err
-		}
-		conn = tx
-	} else {
-		// we want simple protocol for non-postgres connections, e.g. pgpool
+	// For non-postgres connections (e.g. pgbouncer, pgpool), use simple protocol
+	if !md.IsPostgresSource() {
 		args = append([]any{pgx.QueryExecModeSimpleProtocol}, args...)
 	}
-	rows, err := conn.Query(ctx, sql, args...)
+	// lock_timeout is set at connection level via RuntimeParams, no need for transaction wrapper
+	rows, err := md.Conn.Query(ctx, sql, args...)
 	if err == nil {
 		return pgx.CollectRows(rows, metrics.RowToMeasurement)
 	}
@@ -51,6 +36,7 @@ func (r *Reaper) DetectSprocChanges(ctx context.Context, md *sources.SourceConn)
 	detectedChanges := make(metrics.Measurements, 0)
 	var firstRun bool
 	l := log.GetLogger(ctx)
+	changeCounts.Target = "functions"
 	l.Debug("checking for sproc changes...")
 	if _, ok := md.ChangeState["sproc_hashes"]; !ok {
 		firstRun = true
@@ -131,6 +117,7 @@ func (r *Reaper) DetectTableChanges(ctx context.Context, md *sources.SourceConn)
 	var firstRun bool
 	var changeCounts ChangeDetectionResults
 	l := log.GetLogger(ctx)
+	changeCounts.Target = "tables"
 	l.Debug("checking for table changes...")
 	if _, ok := md.ChangeState["table_hashes"]; !ok {
 		firstRun = true
@@ -214,6 +201,7 @@ func (r *Reaper) DetectIndexChanges(ctx context.Context, md *sources.SourceConn)
 	var firstRun bool
 	var changeCounts ChangeDetectionResults
 	l := log.GetLogger(ctx)
+	changeCounts.Target = "indexes"
 	l.Debug("checking for index changes...")
 	if _, ok := md.ChangeState["index_hashes"]; !ok {
 		firstRun = true
@@ -296,6 +284,7 @@ func (r *Reaper) DetectPrivilegeChanges(ctx context.Context, md *sources.SourceC
 	var firstRun bool
 	var changeCounts ChangeDetectionResults
 	l := log.GetLogger(ctx)
+	changeCounts.Target = "privileges"
 	l.Debug("checking object privilege changes...")
 	if _, ok := md.ChangeState["object_privileges"]; !ok {
 		firstRun = true
@@ -377,6 +366,7 @@ func (r *Reaper) DetectConfigurationChanges(ctx context.Context, md *sources.Sou
 	var firstRun bool
 	var changeCounts ChangeDetectionResults
 	l := log.GetLogger(ctx)
+	changeCounts.Target = "settings"
 	l.Debug("checking for configuration changes...")
 	if _, ok := md.ChangeState["configuration_hashes"]; !ok {
 		firstRun = true
@@ -446,60 +436,36 @@ func (r *Reaper) DetectConfigurationChanges(ctx context.Context, md *sources.Sou
 // GetInstanceUpMeasurement returns a single measurement with "instance_up" metric
 // used to detect if the instance is up or down
 func (r *Reaper) GetInstanceUpMeasurement(ctx context.Context, md *sources.SourceConn) (metrics.Measurements, error) {
-	err := md.Conn.Ping(ctx)
 	return metrics.Measurements{
 		metrics.Measurement{
 			metrics.EpochColumnName: time.Now().UnixNano(),
 			"instance_up": func() int {
-				if err == nil {
+				if md.Conn.Ping(ctx) == nil {
 					return 1
 				}
 				return 0
 			}(), // true if connection is up
 		},
-	}, err
+	}, nil // always return nil error for the status metric
 }
 
-func (r *Reaper) CheckForPGObjectChangesAndStore(ctx context.Context, md *sources.SourceConn) {
-	var err error
-	l := log.GetLogger(ctx).WithField("source", md.Name).WithField("metric", specialMetricChangeEvents)
-	ctx = log.WithLogger(ctx, l)
-	sprocCounts := r.DetectSprocChanges(ctx, md) // TODO some of Detect*() code could be unified...
-	tableCounts := r.DetectTableChanges(ctx, md)
-	indexCounts := r.DetectIndexChanges(ctx, md)
-	confCounts := r.DetectConfigurationChanges(ctx, md)
-	privChangeCounts := r.DetectPrivilegeChanges(ctx, md)
+func (r *Reaper) GetObjectChangesMeasurement(ctx context.Context, md *sources.SourceConn) (metrics.Measurements, error) {
+	md.Lock()
+	defer md.Unlock()
 
-	// need to send info on all object changes as one message as Grafana applies "last wins" for annotations with similar timestamp
-	if sprocCounts.Total() > 0 {
-		l = l.WithField("functions", sprocCounts.String())
+	spN := r.DetectSprocChanges(ctx, md)
+	tblN := r.DetectTableChanges(ctx, md)
+	idxN := r.DetectIndexChanges(ctx, md)
+	cnfN := r.DetectConfigurationChanges(ctx, md)
+	privN := r.DetectPrivilegeChanges(ctx, md)
+
+	if spN.Total()+tblN.Total()+idxN.Total()+cnfN.Total()+privN.Total() == 0 {
+		return nil, nil
 	}
-	if tableCounts.Total() > 0 {
-		l = l.WithField("relations", tableCounts.String())
-	}
-	if indexCounts.Total() > 0 {
-		l = l.WithField("indexes", indexCounts.String())
-	}
-	if confCounts.Total() > 0 {
-		l = l.WithField("settings", confCounts.String())
-	}
-	if privChangeCounts.Total() > 0 {
-		l = l.WithField("privileges", privChangeCounts.String())
-	}
-	if len(l.Data) > 2 { // source and metric are always there
-		m := metrics.NewMeasurement(time.Now().UnixNano())
-		if m["details"], err = l.String(); err != nil {
-			l.Error(err)
-			return
-		}
-		r.measurementCh <- metrics.MeasurementEnvelope{
-			DBName:     md.Name,
-			MetricName: "object_changes",
-			Data:       metrics.Measurements{m},
-			CustomTags: md.CustomTags,
-		}
-		l.Info("detected changes [created/altered/dropped]")
-	}
+
+	m := metrics.NewMeasurement(time.Now().UnixNano())
+	m["details"] = strings.Join([]string{spN.String(), tblN.String(), idxN.String(), cnfN.String(), privN.String()}, " ")
+	return metrics.Measurements{m}, nil
 }
 
 // Called once on daemon startup if some commonly wanted extension (most notably pg_stat_statements) is missing.
@@ -560,7 +526,7 @@ func TryCreateMetricsFetchingHelpers(ctx context.Context, md *sources.SourceConn
 	return
 }
 
-func (r *Reaper) CloseResourcesForRemovedMonitoredDBs(shutDownDueToRoleChange map[string]bool) {
+func (r *Reaper) CloseResourcesForRemovedMonitoredDBs(hostsToShutDown map[string]bool) {
 	for _, prevDB := range r.prevLoopMonitoredDBs {
 		if r.monitoredSources.GetMonitoredDatabase(prevDB.Name) == nil { // removed from config
 			prevDB.Conn.Close()
@@ -568,10 +534,10 @@ func (r *Reaper) CloseResourcesForRemovedMonitoredDBs(shutDownDueToRoleChange ma
 		}
 	}
 
-	for roleChangedDB := range shutDownDueToRoleChange {
-		if db := r.monitoredSources.GetMonitoredDatabase(roleChangedDB); db != nil {
+	for toShutDownDB := range hostsToShutDown {
+		if db := r.monitoredSources.GetMonitoredDatabase(toShutDownDB); db != nil {
 			db.Conn.Close()
 		}
-		_ = r.SinksWriter.SyncMetric(roleChangedDB, "", sinks.DeleteOp)
+		_ = r.SinksWriter.SyncMetric(toShutDownDB, "", sinks.DeleteOp)
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/metrics"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sinks"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sinks"
 	"github.com/sirupsen/logrus"
 )
 
@@ -60,6 +60,7 @@ func (cmd *ConcurrentMetricDefs) Assign(newDefs *metrics.Metrics) {
 }
 
 type ChangeDetectionResults struct { // for passing around DDL/index/config change detection results
+	Target  string
 	Created int
 	Altered int
 	Dropped int
@@ -70,7 +71,7 @@ func (cdr *ChangeDetectionResults) Total() int {
 }
 
 func (cdr *ChangeDetectionResults) String() string {
-	return fmt.Sprintf("%d/%d/%d", cdr.Created, cdr.Altered, cdr.Dropped)
+	return fmt.Sprintf("%s: %d/%d/%d", cdr.Target, cdr.Created, cdr.Altered, cdr.Dropped)
 }
 
 type ExistingPartitionInfo struct {

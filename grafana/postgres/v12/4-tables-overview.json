@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 35,
+  "id": 8,
   "links": [],
   "panels": [
     {
@@ -47,7 +47,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -79,6 +79,10 @@
                 "value": "Table Name"
               },
               {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
                 "id": "links",
                 "value": [
                   {
@@ -90,7 +94,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 403
               }
             ]
           },
@@ -169,17 +173,9 @@
       "id": 12,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -188,7 +184,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select\n  x.*,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nfrom (\nSELECT\n  dbname,\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'total_relation_size_b')::int8) as total_relation_size,\n  max((data->>'table_size_b')::int8) as data_size\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY 1, 2\nORDER BY 3 DESC NULLS LAST\nLIMIT $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "select\n  x.*,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nfrom (\nSELECT\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'total_relation_size_b')::int8) as total_relation_size,\n  max((data->>'table_size_b')::int8) as data_size\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY 1 \nORDER BY 2 DESC NULLS LAST\nLIMIT $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -208,7 +204,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -239,6 +235,10 @@
                 "value": "Table Name"
               },
               {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
                 "id": "links",
                 "value": [
                   {
@@ -250,7 +250,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 403
               }
             ]
           },
@@ -329,17 +329,9 @@
       "id": 13,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -348,7 +340,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  x.*,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  dbname,\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'total_relation_size_b')::int8) as total_relation_size,\n  max((data->>'table_size_b')::int8) as data_size\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY 1, 2\nORDER BY 4 DESC NULLS LAST\nLIMIT $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "SELECT\n  x.*,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'total_relation_size_b')::int8) as total_relation_size,\n  max((data->>'table_size_b')::int8) as data_size\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY 1 \nORDER BY 3 DESC NULLS LAST\nLIMIT $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -368,7 +360,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -399,6 +391,10 @@
                 "value": "Table Name"
               },
               {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
                 "id": "links",
                 "value": [
                   {
@@ -410,7 +406,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 403
               }
             ]
           },
@@ -489,17 +485,9 @@
       "id": 5,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -508,7 +496,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  x.*,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\n  SELECT\n    dbname,\n    tag_data->>'table_full_name' as table_full_name,\n    max((data->>'total_relation_size_b')::int8) - min((data->>'total_relation_size_b')::int8) as growth,\n    max((data->>'total_relation_size_b')::int8) as total_relation_size\n  FROM\n    table_stats\n  WHERE\n    $__timeFilter(time)\n    AND dbname = '$dbname'\n  GROUP BY 1, 2\n  ORDER BY growth DESC NULLS LAST\n  LIMIT $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "SELECT\n  x.*,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\n  SELECT\n   tag_data->>'table_full_name' as table_full_name,\n    max((data->>'total_relation_size_b')::int8) - min((data->>'total_relation_size_b')::int8) as growth,\n    max((data->>'total_relation_size_b')::int8) as total_relation_size\n  FROM\n    table_stats\n  WHERE\n    $__timeFilter(time)\n    AND dbname = '$dbname'\n  GROUP BY 1 \n  ORDER BY growth DESC NULLS LAST\n  LIMIT $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -528,7 +516,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -559,6 +547,10 @@
                 "value": "Table Name"
               },
               {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
                 "id": "links",
                 "value": [
                   {
@@ -570,7 +562,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 403
               }
             ]
           },
@@ -649,17 +641,9 @@
       "id": 4,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -668,7 +652,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  x.*,\n  (data->>'table_size_b')::int8 as table_size,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  dbname,\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'seq_scan')::int8) - min((data->>'seq_scan')::int8) as seq_scan\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\n  AND (data->>'table_size_b')::int8 > 100000000\nGROUP BY\n  1, 2\nHAVING\n  max((data->>'seq_scan')::int8) > min((data->>'seq_scan')::int8)\nORDER BY\n  3 DESC\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "SELECT\n  x.*,\n  (data->>'table_size_b')::int8 as table_size,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'seq_scan')::int8) - min((data->>'seq_scan')::int8) as seq_scan\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\n  AND (data->>'table_size_b')::int8 > 100000000\n GROUP BY\n  1 \nHAVING\n  max((data->>'seq_scan')::int8) > min((data->>'seq_scan')::int8)\nORDER BY\n  2 DESC\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -688,7 +672,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -719,6 +703,10 @@
                 "value": "Table Name"
               },
               {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
                 "id": "links",
                 "value": [
                   {
@@ -730,7 +718,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 403
               }
             ]
           },
@@ -809,17 +797,9 @@
       "id": 6,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -828,7 +808,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  x.*,\n  (data->>'total_relation_size_b')::int8 as total_relation_size,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  dbname,\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'n_tup_ins')::int8) - min((data->>'n_tup_ins')::int8) as ins\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1, 2\nHAVING\n  max((data->>'n_tup_ins')::int8) > min((data->>'n_tup_ins')::int8)\nORDER BY\n  3 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "SELECT\n  x.*,\n  (data->>'total_relation_size_b')::int8 as total_relation_size,\n  (data->>'seconds_since_last_vacuum')::int8 as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'n_tup_ins')::int8) - min((data->>'n_tup_ins')::int8) as ins\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1 \nHAVING\n  max((data->>'n_tup_ins')::int8) > min((data->>'n_tup_ins')::int8)\nORDER BY\n  2 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -848,7 +828,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -879,6 +859,10 @@
                 "value": "Table Name"
               },
               {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
                 "id": "links",
                 "value": [
                   {
@@ -890,7 +874,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 403
               }
             ]
           },
@@ -969,17 +953,9 @@
       "id": 7,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -988,7 +964,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  x.*,\n  (data->>'total_relation_size_b')::int8 as total_relation_size,  \n  (data->>'seconds_since_last_vacuum')::int8  as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  dbname,\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'n_tup_upd')::int8) - min((data->>'n_tup_upd')::int8) as upd -- assumes no reset\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1, 2\nHAVING\n  max((data->>'n_tup_upd')::int8) > min((data->>'n_tup_upd')::int8)\nORDER BY\n  3 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "SELECT\n  x.*,\n  (data->>'total_relation_size_b')::int8 as total_relation_size,  \n  (data->>'seconds_since_last_vacuum')::int8  as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'n_tup_upd')::int8) - min((data->>'n_tup_upd')::int8) as upd -- assumes no reset\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1 \nHAVING\n  max((data->>'n_tup_upd')::int8) > min((data->>'n_tup_upd')::int8)\nORDER BY\n  2 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -1008,7 +984,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -1039,6 +1015,10 @@
                 "value": "Table Name"
               },
               {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
                 "id": "links",
                 "value": [
                   {
@@ -1050,7 +1030,7 @@
               },
               {
                 "id": "custom.width",
-                "value": 200
+                "value": 403
               }
             ]
           },
@@ -1129,17 +1109,9 @@
       "id": 8,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1148,7 +1120,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  x.*,\n  (data->>'total_relation_size_b')::int8 as total_relation_size,  \n  (data->>'seconds_since_last_vacuum')::int8  as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  dbname,\n  tag_data->>'table_full_name' as table_full_name,\n  max((data->>'n_tup_del')::int8) - min((data->>'n_tup_del')::int8) as del -- assumes no reset\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1, 2\nHAVING\n  max((data->>'n_tup_del')::int8) > min((data->>'n_tup_del')::int8)\nORDER BY\n  3 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "SELECT\n  x.*,\n  (data->>'total_relation_size_b')::int8 as total_relation_size,  \n  (data->>'seconds_since_last_vacuum')::int8  as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n   tag_data->>'table_full_name' as table_full_name,\n  max((data->>'n_tup_del')::int8) - min((data->>'n_tup_del')::int8) as del -- assumes no reset\nFROM\n  table_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1 \nHAVING\n  max((data->>'n_tup_del')::int8) > min((data->>'n_tup_del')::int8)\nORDER BY\n  2 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -1168,7 +1140,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -1196,6 +1168,10 @@
               {
                 "id": "displayName",
                 "value": "Table Name"
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
               },
               {
                 "id": "links",
@@ -1304,17 +1280,9 @@
       "id": 11,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -1323,7 +1291,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  x.*,\n  (data->>'table_size_b')::int8 as data_size,\n  (data->>'seq_scan')::int8 - (select (data->>'seq_scan')::int8 from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time limit 1) as seq_scan,\n  (data->>'seconds_since_last_vacuum')::int8  as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n  dbname,\n  tag_data->>'table_full_name' as table_full_name,\n  8192 * (coalesce(max((data->>'heap_blks_read')::int8) - min((data->>'heap_blks_read')::int8), 0) + coalesce(max((data->>'toast_blks_read')::int8) - min((data->>'toast_blks_read')::int8), 0) + coalesce(max((data->>'tidx_blks_read')::int8) - min((data->>'tidx_blks_read')::int8), 0)) as blks_read\nFROM\n  table_io_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1, 2\nHAVING\n  max((data->>'heap_blks_read')::int8) > min((data->>'heap_blks_read')::int8)\nORDER BY\n  3 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = x.dbname and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
+          "rawSql": "SELECT\n  x.*,\n  (data->>'table_size_b')::int8 as data_size,\n  (data->>'seq_scan')::int8 - (select (data->>'seq_scan')::int8 from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time limit 1) as seq_scan,\n  (data->>'seconds_since_last_vacuum')::int8  as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\nFROM (\nSELECT\n   tag_data->>'table_full_name' as table_full_name,\n  8192 * (coalesce(max((data->>'heap_blks_read')::int8) - min((data->>'heap_blks_read')::int8), 0) + coalesce(max((data->>'toast_blks_read')::int8) - min((data->>'toast_blks_read')::int8), 0) + coalesce(max((data->>'tidx_blks_read')::int8) - min((data->>'tidx_blks_read')::int8), 0)) as blks_read\nFROM\n  table_io_stats\nWHERE\n  $__timeFilter(time)\n  AND dbname = '$dbname'\nGROUP BY\n  1 \nHAVING\n  max((data->>'heap_blks_read')::int8) > min((data->>'heap_blks_read')::int8)\nORDER BY\n  2 DESC NULLS LAST\nLIMIT\n  $top\n) x\njoin lateral (select data from table_stats where dbname = '$dbname' and tag_data->>'table_full_name' = x.table_full_name and $__timeFilter(time) order by time desc limit 1) y on true",
           "refId": "A",
           "resultFormat": "table"
         }
@@ -1332,12 +1300,195 @@
       "type": "table"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "pgwatch-metrics"
+      },
+      "description": "Tables with the oldest non-frozen transaction id age.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "table_full_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Table Name"
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "View Table Details",
+                    "url": "/d/table-details/table-details?orgId=1&var-dbname=${dbname}&var-table_full_name=${__data.fields.table_full_name}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 440
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_vacuum"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Last Vacuum"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_analyze"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Last Analyze"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tx_freeze_age"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Oldest non-frozen xid age"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Oldest non-frozen xid age"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 246
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dbname"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Source Name"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "id": 202,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "pgwatch-metrics"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n*\nFROM\n(\n  SELECT DISTINCT ON (table_full_name)\n  tag_data->>'table_full_name' as table_full_name,\n  data->>'tx_freeze_age' as tx_freeze_age,\n  (data->>'seconds_since_last_vacuum')::int8  as last_vacuum,\n  (data->>'seconds_since_last_analyze')::int8 as last_analyze\n  FROM\n    table_stats\n  WHERE\n    $__timeFilter(time)\n    AND dbname = '$dbname'\n  ORDER BY\n    1, time DESC\n)\nORDER BY 2 DESC NULLS LAST\nLIMIT $top\n",
+          "refId": "A",
+          "resultFormat": "table",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Tables with oldest non-frozen xid age",
+      "type": "table"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 64
       },
       "id": 200,
       "panels": [],
@@ -1346,7 +1497,8 @@
     },
     {
       "datasource": {
-        "type": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "pgwatch-metrics"
       },
       "description": "Interactive treemap visualization showing relative sizes of tables and their indexes. Larger rectangles represent bigger tables.",
       "fieldConfig": {
@@ -1375,7 +1527,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 65
       },
       "id": 3,
       "maxDataPoints": 100,
@@ -1388,7 +1540,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "pgwatch-metrics"
           },
           "format": "table",
           "rawQuery": true,
@@ -1401,7 +1554,8 @@
     },
     {
       "datasource": {
-        "type": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "pgwatch-metrics"
       },
       "description": "Interactive treemap visualization showing table data sizes excluding indexes and TOAST. Useful for identifying tables with large amounts of actual data.",
       "fieldConfig": {
@@ -1427,7 +1581,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 75
       },
       "id": 1,
       "options": {
@@ -1439,7 +1593,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "pgwatch-metrics"
           },
           "format": "table",
           "rawQuery": true,
@@ -1452,7 +1607,8 @@
     },
     {
       "datasource": {
-        "type": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "pgwatch-metrics"
       },
       "description": "Interactive treemap visualization showing index sizes. Helps identify large indexes that may need optimization or rebuilding.",
       "fieldConfig": {
@@ -1481,7 +1637,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 85
       },
       "id": 2,
       "maxDataPoints": 100,
@@ -1494,7 +1650,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "pgwatch-metrics"
           },
           "format": "table",
           "rawQuery": true,
@@ -1514,7 +1671,7 @@
         "h": 5,
         "w": 11,
         "x": 0,
-        "y": 85
+        "y": 92
       },
       "id": 201,
       "options": {
@@ -1526,7 +1683,7 @@
         "content": "### Brought to you by\n\n[![Cybertec – The PostgreSQL Database Company](https://www.cybertec-postgresql.com/wp-content/uploads/2025/02/cybertec-logo-white-blue.svg)](https://www.cybertec-postgresql.com/en/)\n",
         "mode": "markdown"
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.3.1",
       "title": "",
       "transparent": true,
       "type": "text"
@@ -1541,16 +1698,13 @@
   "templating": {
     "list": [
       {
-        "current": {
-          "text": "demo",
-          "value": "demo"
-        },
         "datasource": {
-          "type": "postgres"
+          "type": "grafana-postgresql-datasource",
+          "uid": "pgwatch-metrics"
         },
         "definition": "",
         "includeAll": false,
-        "label": "Monitored Source",
+        "label": "Source Name",
         "name": "dbname",
         "options": [],
         "query": "SELECT DISTINCT dbname FROM admin.all_distinct_dbname_metrics WHERE metric = 'table_stats' ORDER BY 1;",
@@ -1612,5 +1766,5 @@
   "timezone": "",
   "title": "4. Tables Overview",
   "uid": "tables-overview",
-  "version": 2
+  "version": 12
 }

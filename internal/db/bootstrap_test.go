@@ -4,33 +4,28 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/db"
-	testcontainers "github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/db"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/testutil"
 )
-
-const ImageName = "docker.io/postgres:17-alpine"
-
-var ctx = context.Background()
 
 func TestPing(t *testing.T) {
 	connStr := "foo_boo"
-	assert.Error(t, db.Ping(ctx, connStr))
+	assert.Error(t, db.Ping(testutil.TestContext, connStr))
 
-	pg, err := initTestContainer()
+	pg, pgTeardown, err := testutil.SetupPostgresContainer()
 	require.NoError(t, err)
-	connStr, err = pg.ConnectionString(ctx)
+	defer pgTeardown()
+
+	connStr, err = pg.ConnectionString(testutil.TestContext)
 	assert.NoError(t, err)
-	assert.NoError(t, db.Ping(ctx, connStr))
-	assert.NoError(t, pg.Terminate(ctx))
+	assert.NoError(t, db.Ping(testutil.TestContext, connStr))
+	assert.NoError(t, pg.Terminate(testutil.TestContext))
 }
 
 func TestDoesSchemaExist(t *testing.T) {
@@ -39,7 +34,7 @@ func TestDoesSchemaExist(t *testing.T) {
 	conn.ExpectQuery("SELECT EXISTS").
 		WithArgs("public").
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
-	exists, err := db.DoesSchemaExist(ctx, conn, "public")
+	exists, err := db.DoesSchemaExist(testutil.TestContext, conn, "public")
 	assert.NoError(t, err)
 	assert.True(t, exists)
 }
@@ -55,42 +50,26 @@ func TestInit(t *testing.T) {
 
 	// Test successful initialization
 	conn.ExpectPing()
-	err = db.Init(ctx, conn, initFunc)
+	err = db.Init(testutil.TestContext, conn, initFunc)
 	assert.NoError(t, err)
 	assert.True(t, initCalled)
 
 	// Test failed initialization with 3 retries
 	conn.ExpectPing().Times(1 + 3).WillReturnError(errors.New("connection failed"))
 	initCalled = false
-	err = db.Init(ctx, conn, initFunc)
+	err = db.Init(testutil.TestContext, conn, initFunc)
 	assert.Error(t, err)
 	assert.False(t, initCalled)
 
 	assert.NoError(t, conn.ExpectationsWereMet())
 }
 
-func initTestContainer() (*postgres.PostgresContainer, error) {
-	dbName := "pgwatch"
-	dbUser := "pgwatch"
-	dbPassword := "pgwatchadmin"
-
-	return postgres.Run(ctx,
-		ImageName,
-		postgres.WithDatabase(dbName),
-		postgres.WithUsername(dbUser),
-		postgres.WithPassword(dbPassword),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
-	)
-}
-
 func TestNew(t *testing.T) {
-	pg, err := initTestContainer()
+	pg, pgTeardown, err := testutil.SetupPostgresContainer()
 	require.NoError(t, err)
-	defer func() { assert.NoError(t, pg.Terminate(ctx)) }()
-	connStr, err := pg.ConnectionString(ctx)
+	defer pgTeardown()
+
+	connStr, err := pg.ConnectionString(testutil.TestContext)
 	t.Log(connStr)
 	assert.NoError(t, err)
 
@@ -104,7 +83,7 @@ func TestNew(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, pool)
 	assert.True(t, initCalled)
-	_, err = pool.Exec(ctx, `DO $$
+	_, err = pool.Exec(testutil.TestContext, `DO $$
 BEGIN
    RAISE NOTICE 'This is a notice';
 END $$;`)

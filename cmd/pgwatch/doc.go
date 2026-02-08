@@ -27,18 +27,13 @@
 //	                                         all monitored DBs when missing. Main
 //	                                         usage - pg_stat_statements
 //	                                         [$PW_TRY_CREATE_LISTED_EXTS_IF_MISSING]
-//
+//	    --create-helpers                     Create helper database objects from
+//	                                         metric definitions
+//	                                         [$PW_CREATE_HELPERS]
 // Metrics:
 //
 //	-m, --metrics=                           File or folder of YAML files with
 //	                                         metrics definitions [$PW_METRICS]
-//	    --create-helpers                     Create helper database objects from
-//	                                         metric definitions
-//	                                         [$PW_CREATE_HELPERS]
-//	    --direct-os-stats                    Extract OS related psutil statistics
-//	                                         not via PL/Python wrappers but
-//	                                         directly on host
-//	                                         [$PW_DIRECT_OS_STATS]
 //	    --instance-level-cache-max-seconds=  Max allowed staleness for instance
 //	                                         level metric data shared between DBs
 //	                                         of an instance. Affects 'continuous'
@@ -59,9 +54,13 @@
 //	                                     may be ignored by some sinks
 //	                                     (default: 950ms)
 //	                                     [$PW_BATCHING_DELAY]
-//	--retention=                         If set, metrics older than that will
-//	                                     be deleted (default: 14)
-//	                                     [$PW_RETENTION]
+//	--retention=                         Delete metrics older than this. 
+//	                                     Must be a valid PostgreSQL interval. 
+//	                                     (default: 14 days) [$PW_RETENTION]
+// --maintenance-interval=               Run pgwatch maintenance tasks on sinks with this interval 
+//										 e.g., deleting old metrics; Set to zero to disable. 
+//										 Must be a valid PostgreSQL interval. 
+// 										 (default: 12 hours) [$PW_MAINTENANCE_INTERVAL]
 //	--real-dbname-field=                 Tag key for real database name
 //	                                     (default: real_dbname)
 //	                                     [$PW_REAL_DBNAME_FIELD]

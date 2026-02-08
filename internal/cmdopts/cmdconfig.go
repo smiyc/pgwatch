@@ -3,9 +3,12 @@ package cmdopts
 import (
 	"context"
 	"errors"
+	"fmt"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/metrics"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sources"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/db"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sinks"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sources"
 )
 
 type ConfigCommand struct {
@@ -36,6 +39,9 @@ func (cmd *ConfigInitCommand) Execute([]string) (err error) {
 	}
 	if cmd.owner.Sources.Sources > "" && cmd.owner.Metrics.Metrics != cmd.owner.Sources.Sources {
 		err = errors.Join(err, cmd.InitSources())
+	}
+	if len(cmd.owner.Sinks.Sinks) > 0 {
+		err = errors.Join(err, cmd.InitSinks())
 	}
 	cmd.owner.CompleteCommand(map[bool]int32{
 		true:  ExitCodeOK,
@@ -68,6 +74,13 @@ func (cmd *ConfigInitCommand) InitMetrics() (err error) {
 	return opts.MetricsReaderWriter.WriteMetrics(defMetrics)
 }
 
+// InitSinks initializes the sinks configuration.
+func (cmd *ConfigInitCommand) InitSinks() (err error) {
+	ctx := context.Background()
+	opts := cmd.owner
+	return opts.InitSinkWriter(ctx)
+}
+
 type ConfigUpgradeCommand struct {
 	owner *Options
 }
@@ -75,25 +88,62 @@ type ConfigUpgradeCommand struct {
 // Execute upgrades the configuration schema.
 func (cmd *ConfigUpgradeCommand) Execute([]string) (err error) {
 	opts := cmd.owner
-	if err = opts.ValidateConfig(); err != nil {
-		return
+	// For upgrade command, validate that at least one component is specified
+	if len(opts.Sources.Sources)+len(opts.Metrics.Metrics)+len(opts.Sinks.Sinks) == 0 {
+		opts.CompleteCommand(ExitCodeConfigError)
+		return errors.New("at least one of --sources, --metrics, or --sink must be specified")
 	}
-	// for now only postgres configuration is upgradable
-	if opts.IsPgConnStr(opts.Metrics.Metrics) && opts.IsPgConnStr(opts.Sources.Sources) {
-		err = opts.InitMetricReader(context.Background())
-		if err != nil {
-			opts.CompleteCommand(ExitCodeConfigError)
-			return
+
+	ctx := context.Background()
+
+	f := func(uri string, newMigratorFunc func() (any, error)) error {
+		if uri == "" {
+			return nil
 		}
-		if m, ok := opts.MetricsReaderWriter.(metrics.Migrator); ok {
-			err = m.Migrate()
-			opts.CompleteCommand(map[bool]int32{
-				true:  ExitCodeOK,
-				false: ExitCodeConfigError,
-			}[err == nil])
-			return
+		if !opts.IsPgConnStr(uri) {
+			return fmt.Errorf("cannot upgrade storage %s: %w", uri, errors.ErrUnsupported)
 		}
+		m, initErr := newMigratorFunc()
+		if initErr != nil {
+			return initErr
+		}
+		return m.(db.Migrator).Migrate()
+
+	}
+
+	err = f(opts.Sources.Sources, func() (any, error) {
+		return sources.NewPostgresSourcesReaderWriter(ctx, opts.Sources.Sources)
+	})
+
+	err = errors.Join(err, f(opts.Metrics.Metrics, func() (any, error) {
+		return metrics.NewPostgresMetricReaderWriter(ctx, opts.Metrics.Metrics)
+	}))
+
+	for _, uri := range opts.Sinks.Sinks {
+		err = errors.Join(err, f(uri, func() (any, error) {
+			return sinks.NewPostgresSinkMigrator(ctx, uri)
+		}))
+	}
+
+	if err == nil {
+		opts.CompleteCommand(ExitCodeOK)
+		return nil
+	}
+
+	// Check if all errors are ErrUnsupported
+	allUnsupported := true
+	for _, e := range err.(interface{ Unwrap() []error }).Unwrap() {
+		if !errors.Is(e, errors.ErrUnsupported) {
+			allUnsupported = false
+			break
+		}
+		fmt.Fprintln(opts.OutputWriter, e)
+	}
+
+	if allUnsupported {
+		opts.CompleteCommand(ExitCodeOK)
+		return nil
 	}
 	opts.CompleteCommand(ExitCodeConfigError)
-	return errors.New("configuration storage does not support upgrade")
+	return err
 }

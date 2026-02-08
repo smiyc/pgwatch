@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,7 +61,7 @@ func TestConfig(t *testing.T) {
 	_, err = New(nil)
 	assert.Error(t, err)
 
-	os.Args = []string{0: "config_test"} // sources arg is missing, but set PW3_CONFIG
+	os.Args = []string{0: "config_test"} // sources arg is missing, but set PW_CONFIG
 	t.Setenv("PW_SOURCES", "postgresql://foo:baz@bar/test")
 	_, err = New(nil)
 	assert.NoError(t, err)

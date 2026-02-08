@@ -10,11 +10,10 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/cmdopts"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/reaper"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/webserver"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/webui"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/cmdopts"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/reaper"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/webserver"
 )
 
 // setupCloseHandler creates a 'listener' on a new goroutine which will notify the
@@ -98,9 +97,13 @@ func main() {
 		return
 	}
 
+	if opts.Metrics.DirectOSStats {
+		logger.Warning("--direct-os-stats flag is deprecated, direct OS access is now applied automatically for relevant metrics if on same host.")
+	}
+
 	reaper := reaper.NewReaper(mainCtx, opts)
 
-	if _, err = webserver.Init(mainCtx, opts.WebUI, webui.WebUIFs, opts.MetricsReaderWriter,
+	if _, err = webserver.Init(mainCtx, opts.WebUI, opts.MetricsReaderWriter,
 		opts.SourcesReaderWriter, reaper); err != nil {
 		exitCode.Store(cmdopts.ExitCodeWebUIError)
 		logger.Error("failed to initialize web UI: ", err)

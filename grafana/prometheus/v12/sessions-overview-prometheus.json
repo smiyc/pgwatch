@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P13C0491EC2EA1DB8"
+        "uid": "pgwatch-prometheus"
       },
       "description": "QPS is an approximation. Requires pg_stat_statements to be installed",
       "fieldConfig": {
@@ -109,10 +109,10 @@
       "pluginVersion": "12.0.0",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "avg(rate(pgwatch_db_stats_xact_commit{dbname='$dbname'}[$agg_interval])) + avg(rate(pgwatch_db_stats_xact_rollback{dbname='$dbname'}[$agg_interval]))",
           "interval": "",
@@ -120,10 +120,10 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "avg(rate(pgwatch_stat_statements_calls_calls{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -138,7 +138,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P13C0491EC2EA1DB8"
+        "uid": "pgwatch-prometheus"
       },
       "description": "",
       "fieldConfig": {
@@ -301,10 +301,10 @@
       "pluginVersion": "12.0.0",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_total{dbname='$dbname'}[$agg_interval]))",
           "interval": "",
@@ -312,10 +312,10 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_active{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -324,10 +324,10 @@
           "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(pgwatch_backends_max_connections{dbname='$dbname'})",
           "hide": false,
@@ -336,10 +336,10 @@
           "refId": "C"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_waiting{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -348,10 +348,10 @@
           "refId": "D"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_idleintransaction{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -360,10 +360,10 @@
           "refId": "E"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(increase(pgwatch_db_stats_deadlocks{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -378,7 +378,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P13C0491EC2EA1DB8"
+        "uid": "pgwatch-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -493,10 +493,10 @@
       "pluginVersion": "12.0.0",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_longest_query_seconds{dbname='$dbname'}[$agg_interval]))",
           "interval": "",
@@ -504,10 +504,10 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(avg_over_time(pgwatch_backends_avg_query_seconds{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -522,7 +522,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P13C0491EC2EA1DB8"
+        "uid": "pgwatch-prometheus"
       },
       "description": "",
       "fieldConfig": {
@@ -543,10 +543,10 @@
       "pluginVersion": "7.5.9",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_longest_tx_seconds{dbname='$dbname'}[$agg_interval]))",
           "interval": "",
@@ -554,10 +554,10 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(avg_over_time(pgwatch_backends_avg_tx_seconds{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -572,7 +572,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P13C0491EC2EA1DB8"
+        "uid": "pgwatch-prometheus"
       },
       "description": "",
       "fieldConfig": {
@@ -593,10 +593,10 @@
       "pluginVersion": "7.5.9",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_longest_session_seconds{dbname='$dbname'}[$agg_interval]))",
           "interval": "",
@@ -604,10 +604,10 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(avg_over_time(pgwatch_backends_avg_session_seconds{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -622,7 +622,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P13C0491EC2EA1DB8"
+        "uid": "pgwatch-prometheus"
       },
       "description": "\"No data\" means no waiting detected",
       "fieldConfig": {
@@ -643,10 +643,10 @@
       "pluginVersion": "7.5.9",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_longest_waiting_seconds{dbname='$dbname'}[$agg_interval]))",
           "interval": "",
@@ -654,10 +654,10 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(avg_over_time(pgwatch_backends_avg_waiting_seconds{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -673,7 +673,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P13C0491EC2EA1DB8"
+        "uid": "pgwatch-prometheus"
       },
       "description": "",
       "fieldConfig": {
@@ -693,10 +693,10 @@
       "pluginVersion": "7.5.9",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(avg_over_time(pgwatch_backends_longest_autovacuum_seconds{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -705,10 +705,10 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P13C0491EC2EA1DB8"
-          },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "pgwatch-prometheus"
+      },
           "exemplar": true,
           "expr": "max(max_over_time(pgwatch_backends_av_workers{dbname='$dbname'}[$agg_interval]))",
           "hide": false,
@@ -736,8 +736,7 @@
           "value": "demo"
         },
         "datasource": {
-          "type": "prometheus",
-          "uid": "P13C0491EC2EA1DB8"
+          "type": "prometheus"
         },
         "definition": "label_values(dbname)",
         "includeAll": false,

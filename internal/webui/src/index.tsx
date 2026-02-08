@@ -3,14 +3,22 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AlertProvider } from "utils/AlertContext";
 import App from "./App";
-import reportWebVitals from "./reportWebVitals";
+
+// Read base path from backend-injected configuration
+declare global {
+  interface Window {
+    __PGWATCH_BASE_PATH__?: string;
+  }
+}
+
+const basename = window.__PGWATCH_BASE_PATH__ || '';
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
 );
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <AlertProvider>
         <App />
       </AlertProvider>
@@ -18,7 +26,3 @@ root.render(
   </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

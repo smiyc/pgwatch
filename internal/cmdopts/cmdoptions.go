@@ -8,12 +8,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/metrics"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sinks"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sources"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/webserver"
-	"github.com/jackc/pgx/v5"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/db"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sinks"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sources"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/webserver"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -121,8 +121,7 @@ func (c *Options) GetConfigKind(arg string) (_ Kind, err error) {
 }
 
 func (c *Options) IsPgConnStr(arg string) bool {
-	_, err := pgx.ParseConfig(arg)
-	return err == nil
+	return db.IsPgConnStr(arg)
 }
 
 // InitMetricReader creates a new source reader based on the configuration kind from the options.
@@ -156,24 +155,37 @@ func (c *Options) InitSourceReader(ctx context.Context) (err error) {
 
 // InitConfigReaders creates the configuration readers based on the configuration kind from the options.
 func (c *Options) InitConfigReaders(ctx context.Context) error {
-	return errors.Join(c.InitMetricReader(ctx), c.InitSourceReader(ctx))
+	err := errors.Join(c.InitMetricReader(ctx), c.InitSourceReader(ctx))
+	if err != nil {
+		return err
+	}
+	return db.NeedsMigration(c.MetricsReaderWriter, metrics.ErrNeedsMigration)
 }
 
 // InitSinkWriter creates a new MultiWriter instance if needed.
 func (c *Options) InitSinkWriter(ctx context.Context) (err error) {
 	c.SinksWriter, err = sinks.NewSinkWriter(ctx, &c.Sinks)
-	return
+	if err != nil {
+		return err
+	}
+	return db.NeedsMigration(c.SinksWriter, sinks.ErrNeedsMigration)
 }
 
 // NeedsSchemaUpgrade checks if the configuration database schema needs an upgrade.
 func (c *Options) NeedsSchemaUpgrade() (upgrade bool, err error) {
-	if m, ok := c.SourcesReaderWriter.(metrics.Migrator); ok {
+	if m, ok := c.SourcesReaderWriter.(db.Migrator); ok {
 		upgrade, err = m.NeedsMigration()
 	}
 	if upgrade || err != nil {
 		return
 	}
-	if m, ok := c.MetricsReaderWriter.(metrics.Migrator); ok {
+	if m, ok := c.MetricsReaderWriter.(db.Migrator); ok {
+		upgrade, err = m.NeedsMigration()
+	}
+	if upgrade || err != nil {
+		return
+	}
+	if m, ok := c.SinksWriter.(db.Migrator); ok {
 		return m.NeedsMigration()
 	}
 	return
@@ -193,7 +205,7 @@ func (c *Options) ValidateConfig() error {
 		c.Metrics.Metrics = c.Sources.Sources
 	}
 	if c.Sources.Refresh <= 1 {
-		return errors.New("--servers-refresh-loop-seconds must be greater than 1")
+		return errors.New("--refresh must be greater than 1")
 	}
 	if c.Sources.MaxParallelConnectionsPerDb < 1 {
 		return errors.New("--max-parallel-connections-per-db must be >= 1")
@@ -201,7 +213,7 @@ func (c *Options) ValidateConfig() error {
 
 	// validate that input is boolean is set
 	if c.Sinks.BatchingDelay <= 0 || c.Sinks.BatchingDelay > time.Hour {
-		return errors.New("--batching-delay-ms must be between 0 and 1h")
+		return errors.New("--batching-delay must be between 0 and 1h")
 	}
 
 	return nil

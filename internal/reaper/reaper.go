@@ -11,11 +11,11 @@ import (
 
 	"sync/atomic"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/cmdopts"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/metrics"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sinks"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/sources"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/cmdopts"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sinks"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/sources"
 )
 
 const (
@@ -88,7 +88,7 @@ func (r *Reaper) Reap(ctx context.Context) {
 		if r.Logging.LogLevel == "debug" {
 			r.PrintMemStats()
 		}
-		if err = r.LoadSources(); err != nil {
+		if err = r.LoadSources(ctx); err != nil {
 			logger.WithError(err).Error("could not refresh active sources, using last valid cache")
 		}
 		if err = r.LoadMetrics(); err != nil {
@@ -99,6 +99,7 @@ func (r *Reaper) Reap(ctx context.Context) {
 		hostsToShutDownDueToRoleChange := make(map[string]bool) // hosts went from master to standby and have "only if master" set
 		for _, monitoredSource := range r.monitoredSources {
 			srcL := logger.WithField("source", monitoredSource.Name)
+			ctx = log.WithLogger(ctx, srcL)
 
 			if monitoredSource.Connect(ctx, r.Sources) != nil {
 				srcL.Warning("could not init connection, retrying on next iteration")
@@ -216,7 +217,9 @@ func (r *Reaper) CreateSourceHelpers(ctx context.Context, srcL log.Logger, monit
 	if r.Sources.TryCreateListedExtsIfMissing > "" {
 		srcL.Info("trying to create extensions if missing")
 		extsToCreate := strings.Split(r.Sources.TryCreateListedExtsIfMissing, ",")
+		monitoredSource.RLock()
 		extsCreated := TryCreateMissingExtensions(ctx, monitoredSource, extsToCreate, monitoredSource.Extensions)
+		monitoredSource.RUnlock()
 		srcL.Infof("%d/%d extensions created based on --try-create-listed-exts-if-missing input %v", len(extsCreated), len(extsToCreate), extsCreated)
 	}
 
@@ -229,7 +232,7 @@ func (r *Reaper) CreateSourceHelpers(ctx context.Context, srcL log.Logger, monit
 
 }
 
-func (r *Reaper) ShutdownOldWorkers(ctx context.Context, hostsToShutDownDueToRoleChange map[string]bool) {
+func (r *Reaper) ShutdownOldWorkers(ctx context.Context, hostsToShutDown map[string]bool) {
 	logger := r.logger
 	// loop over existing channels and stop workers if DB or metric removed from config
 	// or state change makes it uninteresting
@@ -238,13 +241,13 @@ func (r *Reaper) ShutdownOldWorkers(ctx context.Context, hostsToShutDownDueToRol
 		var currentMetricConfig map[string]float64
 		var md *sources.SourceConn
 		var dbRemovedFromConfig bool
-		singleMetricDisabled := false
+		var metricRemovedFromPreset bool
 		splits := strings.Split(dbMetric, dbMetricJoinStr)
 		db := splits[0]
 		metric := splits[1]
 
-		_, wholeDbShutDownDueToRoleChange := hostsToShutDownDueToRoleChange[db]
-		if !wholeDbShutDownDueToRoleChange {
+		_, wholeDbShutDown := hostsToShutDown[db]
+		if !wholeDbShutDown {
 			md = r.monitoredSources.GetMonitoredDatabase(db)
 			if md == nil { // normal removing of DB from config
 				dbRemovedFromConfig = true
@@ -252,17 +255,22 @@ func (r *Reaper) ShutdownOldWorkers(ctx context.Context, hostsToShutDownDueToRol
 			}
 		}
 
-		if !(wholeDbShutDownDueToRoleChange || dbRemovedFromConfig) { // maybe some single metric was disabled
+		// Detects metrics removed from a preset definition.
+		//
+		// If not using presets, a metric removed from configs will
+		// be detected earlier by `LoadSources()` as configs change that 
+		// triggers a restart and get passed in `hostsToShutDown`.
+		if !(wholeDbShutDown || dbRemovedFromConfig) {
 			if md.IsInRecovery && len(md.MetricsStandby) > 0 {
 				currentMetricConfig = md.MetricsStandby
 			} else {
 				currentMetricConfig = md.Metrics
 			}
 			interval, isMetricActive := currentMetricConfig[metric]
-			singleMetricDisabled = !isMetricActive || interval <= 0
+			metricRemovedFromPreset = !isMetricActive || interval <= 0
 		}
 
-		if ctx.Err() != nil || wholeDbShutDownDueToRoleChange || dbRemovedFromConfig || singleMetricDisabled {
+		if ctx.Err() != nil || wholeDbShutDown || dbRemovedFromConfig || metricRemovedFromPreset {
 			logger.WithField("source", db).WithField("metric", metric).Info("stopping gatherer...")
 			cancelFunc()
 			delete(r.cancelFuncs, dbMetric)
@@ -273,7 +281,7 @@ func (r *Reaper) ShutdownOldWorkers(ctx context.Context, hostsToShutDownDueToRol
 	}
 
 	// Destroy conn pools and metric writers
-	r.CloseResourcesForRemovedMonitoredDBs(hostsToShutDownDueToRoleChange)
+	r.CloseResourcesForRemovedMonitoredDBs(hostsToShutDown)
 }
 
 func (r *Reaper) reapMetricMeasurements(ctx context.Context, md *sources.SourceConn, metricName string) {
@@ -285,9 +293,19 @@ func (r *Reaper) reapMetricMeasurements(ctx context.Context, md *sources.SourceC
 	failedFetches := 0
 	lastDBVersionFetchTime := time.Unix(0, 0) // check DB ver. ev. 5 min
 
-	l := r.logger.WithField("source", md.Name).WithField("metric", metricName)
+	l := log.GetLogger(ctx).WithField("metric", metricName)
+	ctx = log.WithLogger(ctx, l)
+
 	if metricName == specialMetricServerLogEventCounts {
-		metrics.ParseLogs(ctx, md, md.RealDbname, md.GetMetricInterval(metricName), r.measurementCh, "", "")
+		lp, err := NewLogParser(ctx, md, r.measurementCh)
+		if err != nil {
+			l.WithError(err).Error("Failed to init log parser")
+			return
+		}
+		err = lp.ParseLogs()
+		if err != nil {
+			l.WithError(err).Error("Error parsing logs")
+		}
 		return
 	}
 
@@ -307,14 +325,13 @@ func (r *Reaper) reapMetricMeasurements(ctx context.Context, md *sources.SourceC
 
 		var metricStoreMessages *metrics.MeasurementEnvelope
 
-		// 1st try local overrides for some metrics if operating in push mode
-		if r.Metrics.DirectOSStats && IsDirectlyFetchableMetric(metricName) {
-			metricStoreMessages, err = r.FetchStatsDirectlyFromOS(ctx, md, metricName)
-			if err != nil {
+		t1 := time.Now()
+		// 1st try local overrides for system metrics if operating on the same host
+		if IsDirectlyFetchableMetric(md, metricName) {
+			if metricStoreMessages, err = r.FetchStatsDirectlyFromOS(ctx, md, metricName); err != nil {
 				l.WithError(err).Errorf("Could not read metric directly from OS")
 			}
 		}
-		t1 := time.Now()
 		if metricStoreMessages == nil {
 			metricStoreMessages, err = r.FetchMetric(ctx, md, metricName)
 		}
@@ -367,7 +384,7 @@ func (r *Reaper) reapMetricMeasurements(ctx context.Context, md *sources.SourceC
 }
 
 // LoadSources loads sources from the reader
-func (r *Reaper) LoadSources() (err error) {
+func (r *Reaper) LoadSources(ctx context.Context) (err error) {
 	if DoesEmergencyTriggerfileExist(r.Metrics.EmergencyPauseTriggerfile) {
 		r.logger.Warningf("Emergency pause triggerfile detected at %s, ignoring currently configured DBs", r.Metrics.EmergencyPauseTriggerfile)
 		r.monitoredSources = make(sources.SourceConns, 0)
@@ -380,7 +397,7 @@ func (r *Reaper) LoadSources() (err error) {
 		return err
 	}
 	srcs = slices.DeleteFunc(srcs, func(s sources.Source) bool {
-		return !s.IsEnabled || len(r.Sources.Groups) > 0 && !s.IsDefaultGroup() && !slices.Contains(r.Sources.Groups, s.Group)
+		return !s.IsEnabled || len(r.Sources.Groups) > 0 && !slices.Contains(r.Sources.Groups, s.Group)
 	})
 	if newSrcs, err = srcs.ResolveDatabases(); err != nil {
 		r.logger.WithError(err).Error("could not resolve databases from sources")
@@ -396,6 +413,10 @@ func (r *Reaper) LoadSources() (err error) {
 			newSrcs[i] = md
 			continue
 		}
+		// Source configs changed, stop all running gatherers to trigger a restart
+		// TODO: Optimize this for single metric addition/deletion/interval-change cases to not do a full restart
+		r.logger.WithField("source", md.Name).Info("Source configs changed, restarting all gatherers...")
+		r.ShutdownOldWorkers(ctx, map[string]bool{md.Name: true})
 	}
 	r.monitoredSources = newSrcs
 	r.logger.WithField("sources", len(r.monitoredSources)).Info("sources refreshed")
@@ -468,7 +489,7 @@ func (r *Reaper) FetchMetric(ctx context.Context, md *sources.SourceConn, metric
 	if metric, ok = metricDefs.GetMetricDef(metricName); !ok {
 		return nil, metrics.ErrMetricNotFound
 	}
-	l := r.logger.WithField("source", md.Name).WithField("metric", metricName)
+	l := log.GetLogger(ctx)
 
 	if metric.IsInstanceLevel && r.Metrics.InstanceLevelCacheMaxSeconds > 0 && time.Second*time.Duration(md.GetMetricInterval(metricName)) < r.Metrics.CacheAge() {
 		cacheKey = fmt.Sprintf("%s:%s", md.GetClusterIdentifier(), metricName)
@@ -482,8 +503,7 @@ func (r *Reaper) FetchMetric(ctx context.Context, md *sources.SourceConn, metric
 		}
 		switch metricName {
 		case specialMetricChangeEvents:
-			r.CheckForPGObjectChangesAndStore(ctx, md)
-			return nil, nil
+			data, err = r.GetObjectChangesMeasurement(ctx, md)
 		case specialMetricInstanceUp:
 			data, err = r.GetInstanceUpMeasurement(ctx, md)
 		default:
@@ -494,7 +514,7 @@ func (r *Reaper) FetchMetric(ctx context.Context, md *sources.SourceConn, metric
 			}
 			data, err = QueryMeasurements(ctx, md, sql)
 		}
-		if err != nil {
+		if err != nil || len(data) == 0 {
 			return nil, err
 		}
 		r.measurementCache.Put(cacheKey, data)

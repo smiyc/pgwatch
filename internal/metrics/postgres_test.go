@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/log"
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/metrics"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/assert"
 )
@@ -157,6 +157,15 @@ func TestNewPostgresMetricReaderWriterConn(t *testing.T) {
 		rw, err := metrics.NewPostgresMetricReaderWriterConn(ctx, conn)
 		a.Error(err)
 		a.Nil(rw)
+		a.NoError(conn.ExpectationsWereMet())
+	})
+
+	t.Run("SchemaExists", func(*testing.T) {
+		conn.ExpectQuery(`SELECT EXISTS`).WithArgs("pgwatch").WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+		conn.ExpectPing()
+		rw, err := metrics.NewPostgresMetricReaderWriterConn(ctx, conn)
+		a.NoError(err)
+		a.NotNil(rw)
 		a.NoError(conn.ExpectationsWereMet())
 	})
 }

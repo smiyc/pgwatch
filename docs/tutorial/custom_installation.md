@@ -12,12 +12,11 @@ visualize the gathered metrics.
 
 ### Overview of installation steps
 
-1. Install Postgres or use any available existing instance - v11+
+1. Install Postgres or use any available existing instance - v14+
     is required but the latest major version is recommended.
 1. Bootstrap the configuration database.
 1. Bootstrap the metrics measurements storage database aka sink (PostgreSQL here).
-1. Install pgwatch - either from pre-built packages or by compiling
-    the Go code.
+1. Install pgwatch
 1. [Prepare](preparing_databases.md) the "to-be-monitored" databases for monitoring by creating
     a dedicated login role name as a minimum.
 1. Add some databases to the monitoring configuration via the Web UI, REST API or
@@ -42,7 +41,7 @@ syntax differences.
 1. **Install Postgres**
 
     Follow the standard Postgres install procedure basically. Use the
-    latest major version available, but minimally v11+ is required.
+    latest major version available, but minimally v14+ is required.
 
     To get the latest Postgres versions, official Postgres PGDG repos
     are to be preferred over default disto repos. Follow the
@@ -54,16 +53,21 @@ syntax differences.
         / RedHat based systems
     - <https://www.postgresql.org/download/windows/> - for Windows
 
-1. **Install pgwatch** either from pre-built packages or by
-    compiling the Go code
+1. **Install pgwatch**
+
+    - For Debian/Ubuntu, add the official [PostgreSQL Apt Repository](https://wiki.postgresql.org/wiki/Apt#Quickstart) then:
+
+        ```bash
+        sudo apt update && sudo apt install pgwatch
+        ```
 
     - Using pre-built packages which are available on the
         [GitHub releases](https://github.com/cybertec-postgresql/pgwatch/releases)
         page:
 
         ```terminal
-        # find out the latest package link and replace below, using v3.0 here
-        wget https://github.com/cybertec-postgresql/pgwatch/releases/download/3.0.0/pgwatch_Linux_x86_64.deb
+        # find out the latest package link and replace below, using v4.0 here
+        wget https://github.com/cybertec-postgresql/pgwatch/releases/download/v4.0.0/pgwatch_Linux_x86_64.deb
         sudo dpkg -i pgwatch_Linux_x86_64.deb
         ```
 
@@ -72,17 +76,25 @@ syntax differences.
         This method of course is not needed unless dealing with maximum
         security environments or some slight code changes are required.
 
-        1. Install Go by following the [official
-            instructions](https://golang.org/doc/install)
+        1. Install Go by following the [official instructions](https://golang.org/doc/install)
 
-        2. Get the pgwatch project's code and compile the gatherer
+        2. Install Protoc and protoc plugins for Go by following the [official instructions](https://grpc.io/docs/languages/go/quickstart/)
+
+        3. Get the pgwatch project's code and compile the gatherer
             daemon
 
-            ```terminal
+            ```bash
+            # Clone the Repo
             git clone https://github.com/cybertec-postgresql/pgwatch.git
+
+            # Build the webui
             cd pgwatch/internal/webui
             yarn install --network-timeout 100000 && yarn build
-            cd ../..
+
+            # generate the Go code from protobuf files
+            cd ../../ && go generate ./api/pb
+
+            # Compile pgwatch
             go build ./cmd/pgwatch/
             ```
 
@@ -105,6 +117,8 @@ syntax differences.
         ExecStart=/usr/bin/pgwatch --sources=postgresql://pgwatch:xyz@localhost:5432/pgwatch --sink=postgresql://pgwatch:xyz@localhost:5432/pgwatch_metrics
         Restart=on-failure
         TimeoutStartSec=0
+        RestartSec=5s
+        TimeoutStopSec=60s
 
         [Install]
         WantedBy=multi-user.target
@@ -297,12 +311,11 @@ setting up a Postgres database for the configuration, one would use a
 YAML file. For details on individual steps like installing pgwatch see the above
 paragraph.
 
-1. Install Postgres or use any available existing instance - v11+
+1. Install Postgres or use any available existing instance - v14+
     is required but the latest major version is recommended.
 1. Edit the YAML file to include the sources to be monitored.
 1. Bootstrap the metrics measurements storage database aka sink (PostgreSQL here).
-1. Install pgwatch - either from pre-built packages or by compiling
-    the Go code.
+1. Install pgwatch
 1. [Prepare](preparing_databases.md) the "to-be-monitored" databases for monitoring by creating
     a dedicated login role name as a minimum.
 1. Add some databases to the monitoring configuration via the Web UI, REST API or

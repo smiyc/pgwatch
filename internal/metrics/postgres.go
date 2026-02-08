@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/db"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/db"
 )
 
 func NewPostgresMetricReaderWriter(ctx context.Context, connstr string) (ReaderWriter, error) {
@@ -21,10 +21,11 @@ func NewPostgresMetricReaderWriterConn(ctx context.Context, conn db.PgxPoolIface
 	if err := initSchema(ctx, conn); err != nil {
 		return nil, err
 	}
-	return &dbMetricReaderWriter{
+	dmrw := &dbMetricReaderWriter{
 		ctx:      ctx,
 		configDb: conn,
-	}, conn.Ping(ctx)
+	}
+	return dmrw, conn.Ping(ctx)
 }
 
 type dbMetricReaderWriter struct {
@@ -33,6 +34,7 @@ type dbMetricReaderWriter struct {
 }
 
 var (
+	ErrNeedsMigration = errors.New("config database schema is outdated, please run migrations using `pgwatch config upgrade` command")
 	ErrMetricNotFound = errors.New("metric not found")
 	ErrPresetNotFound = errors.New("preset not found")
 	ErrInvalidMetric  = errors.New("invalid metric")
@@ -42,7 +44,7 @@ var (
 )
 
 // make sure *dbMetricReaderWriter implements the Migrator interface
-var _ Migrator = (*dbMetricReaderWriter)(nil)
+var _ db.Migrator = (*dbMetricReaderWriter)(nil)
 
 // writeMetricsToPostgres writes the metrics and presets definitions to the
 // pgwatch.metric and pgwatch.preset tables in the ConfigDB.

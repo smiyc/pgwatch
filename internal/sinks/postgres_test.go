@@ -3,21 +3,21 @@ package sinks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/cybertec-postgresql/pgwatch/v3/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/log"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/metrics"
+	"github.com/cybertec-postgresql/pgwatch/v5/internal/testutil"
 	"github.com/jackc/pgx/v5"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	testcontainers "github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-var ctx = context.Background()
+var ctx = log.WithLogger(context.Background(), log.NewNoopLogger())
 
 func TestReadMetricSchemaType(t *testing.T) {
 	conn, err := pgxmock.NewPool()
@@ -39,22 +39,82 @@ func TestReadMetricSchemaType(t *testing.T) {
 }
 
 func TestNewWriterFromPostgresConn(t *testing.T) {
-	conn, err := pgxmock.NewPool()
-	assert.NoError(t, err)
-
-	conn.ExpectPing()
-	conn.ExpectQuery("SELECT EXISTS").WithArgs("admin").WillReturnRows(pgxmock.NewRows([]string{"schema_type"}).AddRow(true))
-	conn.ExpectQuery("SELECT schema_type").WillReturnRows(pgxmock.NewRows([]string{"schema_type"}).AddRow(true))
-	for _, m := range metrics.GetDefaultBuiltInMetrics() {
-		conn.ExpectExec("select admin.ensure_dummy_metrics_table").WithArgs(m).WillReturnResult(pgxmock.NewResult("EXECUTE", 1))
+	a := assert.New(t)
+	opts := &CmdOpts{
+		BatchingDelay:       time.Hour,
+		RetentionInterval:   "1 day",
+		MaintenanceInterval: "1 day",
+		PartitionInterval:   "1 hour",
 	}
 
-	opts := &CmdOpts{BatchingDelay: time.Hour, Retention: 356}
-	pgw, err := NewWriterFromPostgresConn(ctx, conn, opts)
-	assert.NoError(t, err)
-	assert.NotNil(t, pgw)
+	t.Run("Success", func(*testing.T) {
+		conn, err := pgxmock.NewPool()
+		a.NoError(err)
 
-	assert.NoError(t, conn.ExpectationsWereMet())
+		conn.ExpectPing()
+		conn.ExpectQuery("SELECT extract").WithArgs("1 day", "1 day", "1 hour").WillReturnRows(
+			pgxmock.NewRows([]string{"col1", "col2", "col3"}).AddRow((24 * time.Hour).Seconds(), (24 * time.Hour).Seconds(), true),
+		)
+		conn.ExpectQuery("SELECT EXISTS").WithArgs("admin").WillReturnRows(pgxmock.NewRows([]string{"schema_type"}).AddRow(true))
+		conn.ExpectQuery("SELECT schema_type").WillReturnRows(pgxmock.NewRows([]string{"schema_type"}).AddRow(true))
+		for _, m := range metrics.GetDefaultBuiltInMetrics() {
+			conn.ExpectExec("SELECT admin.ensure_dummy_metrics_table").WithArgs(m).WillReturnResult(pgxmock.NewResult("EXECUTE", 1))
+		}
+
+		pgw, err := NewWriterFromPostgresConn(ctx, conn, opts)
+		a.NoError(err)
+		a.NotNil(pgw)
+		a.NoError(conn.ExpectationsWereMet())
+	})
+
+	t.Run("InitFail", func(*testing.T) {
+		conn, err := pgxmock.NewPool()
+		a.NoError(err)
+
+		conn.ExpectPing().WillReturnError(assert.AnError)
+
+		pgw, err := NewWriterFromPostgresConn(ctx, conn, opts)
+		a.Error(err)
+		a.Nil(pgw)
+		a.NoError(conn.ExpectationsWereMet())
+	})
+
+
+
+	t.Run("ReadMetricSchemaTypeFail", func(*testing.T) {
+		conn, err := pgxmock.NewPool()
+		a.NoError(err)
+
+		conn.ExpectPing()
+		conn.ExpectQuery("SELECT extract").WithArgs("1 day", "1 day", "1 hour").WillReturnRows(
+			pgxmock.NewRows([]string{"col1", "col2", "col3"}).AddRow((24 * time.Hour).Seconds(), (24 * time.Hour).Seconds(), true),
+		)
+		conn.ExpectQuery("SELECT EXISTS").WithArgs("admin").WillReturnRows(pgxmock.NewRows([]string{"schema_type"}).AddRow(true))
+		conn.ExpectQuery("SELECT schema_type").WillReturnError(assert.AnError)
+
+		pgw, err := NewWriterFromPostgresConn(ctx, conn, opts)
+		a.Error(err)
+		a.Nil(pgw)
+		a.NoError(conn.ExpectationsWereMet())
+	})
+
+	t.Run("EnsureBuiltinMetricDummiesFail", func(*testing.T) {
+		conn, err := pgxmock.NewPool()
+		a.NoError(err)
+
+		conn.ExpectPing()
+		conn.ExpectQuery("SELECT extract").WithArgs("1 day", "1 day", "1 hour").WillReturnRows(
+			pgxmock.NewRows([]string{"col1", "col2", "col3"}).AddRow((24 * time.Hour).Seconds(), (24 * time.Hour).Seconds(), true),
+		)
+		conn.ExpectQuery("SELECT EXISTS").WithArgs("admin").WillReturnRows(pgxmock.NewRows([]string{"schema_type"}).AddRow(true))
+		conn.ExpectQuery("SELECT schema_type").WillReturnRows(pgxmock.NewRows([]string{"schema_type"}).AddRow(true))
+		conn.ExpectExec("SELECT admin.ensure_dummy_metrics_table").WithArgs(pgxmock.AnyArg()).WillReturnError(assert.AnError)
+
+		pgw, err := NewWriterFromPostgresConn(ctx, conn, opts)
+		a.Error(err)
+		a.Nil(pgw)
+		a.NoError(conn.ExpectationsWereMet())
+	})
 }
 
 func TestSyncMetric(t *testing.T) {
@@ -67,8 +127,8 @@ func TestSyncMetric(t *testing.T) {
 	dbUnique := "mydb"
 	metricName := "mymetric"
 	op := AddOp
-	conn.ExpectExec("insert into admin\\.all_distinct_dbname_metrics").WithArgs(dbUnique, metricName).WillReturnResult(pgxmock.NewResult("EXECUTE", 1))
-	conn.ExpectExec("select admin\\.ensure_dummy_metrics_table").WithArgs(metricName).WillReturnResult(pgxmock.NewResult("EXECUTE", 1))
+	conn.ExpectExec("INSERT INTO admin\\.all_distinct_dbname_metrics").WithArgs(dbUnique, metricName).WillReturnResult(pgxmock.NewResult("EXECUTE", 1))
+	conn.ExpectExec("SELECT admin\\.ensure_dummy_metrics_table").WithArgs(metricName).WillReturnResult(pgxmock.NewResult("EXECUTE", 1))
 	err = pgw.SyncMetric(dbUnique, metricName, op)
 	assert.NoError(t, err)
 	assert.NoError(t, conn.ExpectationsWereMet())
@@ -451,19 +511,13 @@ func TestCopyFromMeasurements_StateManagement(t *testing.T) {
 func TestCopyFromMeasurements_CopyFail(t *testing.T) {
 	a := assert.New(t)
 	r := require.New(t)
-	const ImageName = "docker.io/postgres:17-alpine"
-	pgContainer, err := postgres.Run(ctx,
-		ImageName,
-		postgres.WithDatabase("mydatabase"),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
-	)
-	r.NoError(err)
-	defer func() { assert.NoError(t, pgContainer.Terminate(ctx)) }()
 
-	connStr, _ := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	pgContainer, pgTearDown, err := testutil.SetupPostgresContainer()
+	r.NoError(err)
+	defer pgTearDown()
+
+	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	r.NoError(err)
 	conn, err := pgx.Connect(ctx, connStr)
 	r.NoError(err)
 
@@ -497,4 +551,427 @@ func TestCopyFromMeasurements_CopyFail(t *testing.T) {
 		}
 	}
 
+}
+
+// tests interval string validation for all
+// cli flags that expect a PostgreSQL interval string
+func TestIntervalValidation(t *testing.T) {
+	a := assert.New(t)
+
+	pgContainer, pgTearDown, err := testutil.SetupPostgresContainer()
+	a.NoError(err)
+	defer pgTearDown()
+
+	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	a.NoError(err)
+
+	opts := &CmdOpts{
+		PartitionInterval:   "1 minute",
+		MaintenanceInterval: "-1 hours",
+		RetentionInterval:   "00:01:30",
+		BatchingDelay:       time.Second,
+	}
+
+	_, err = NewPostgresWriter(ctx, connStr, opts)
+	a.EqualError(err, "--partition-interval must be at least 1 hour, got: 1 minute")
+	opts.PartitionInterval = "1 hour"
+
+	_, err = NewPostgresWriter(ctx, connStr, opts)
+	a.EqualError(err, "--maintenance-interval must be a positive PostgreSQL interval or 0 to disable it")
+	opts.MaintenanceInterval = "0 hours"
+
+	_, err = NewPostgresWriter(ctx, connStr, opts)
+	a.Error(err)
+
+	invalidIntervals := []string{
+		"not an interval", "3 dayss",
+		"four hours",
+	}
+
+	for _, interval := range invalidIntervals {
+		opts.PartitionInterval = interval
+		_, err = NewPostgresWriter(ctx, connStr, opts)
+		a.Error(err)
+		opts.PartitionInterval = "1 hour"
+
+		opts.MaintenanceInterval = interval
+		_, err = NewPostgresWriter(ctx, connStr, opts)
+		a.Error(err)
+		opts.MaintenanceInterval = "1 hour"
+
+		opts.RetentionInterval = interval
+		_, err = NewPostgresWriter(ctx, connStr, opts)
+		a.Error(err)
+		opts.RetentionInterval = "1 hour"
+	}
+
+	validIntervals := []string{
+		"3 days 4 hours", "1 year",
+		"P3D", "PT3H", "0-02", "1 00:00:00",
+		"P0-02", "P1", "2 weeks",
+	}
+
+	for _, interval := range validIntervals {
+		opts.PartitionInterval = interval
+		opts.MaintenanceInterval = interval
+		opts.RetentionInterval = interval
+
+		_, err = NewPostgresWriter(ctx, connStr, opts)
+		a.NoError(err)
+	}
+}
+
+func TestPartitionInterval(t *testing.T) {
+	a := assert.New(t)
+	r := require.New(t)
+
+	pgContainer, pgTearDown, err := testutil.SetupPostgresContainer()
+	r.NoError(err)
+	defer pgTearDown()
+
+	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	r.NoError(err)
+
+	opts := &CmdOpts{
+		PartitionInterval:   "3 weeks",
+		RetentionInterval:   "14 days",
+		MaintenanceInterval: "12 hours",
+		BatchingDelay:       time.Second,
+	}
+
+	pgw, err := NewPostgresWriter(ctx, connStr, opts)
+	r.NoError(err)
+
+	conn, err := pgx.Connect(ctx, connStr)
+	r.NoError(err)
+
+	m := map[string]map[string]ExistingPartitionInfo{
+		"test_metric": {
+			"test_db": {
+				time.Now(), time.Now().Add(time.Hour),
+			},
+		},
+	}
+	err = pgw.EnsureMetricDbnameTime(m)
+	r.NoError(err)
+
+	var partitionsNum int
+	err = conn.QueryRow(ctx, "SELECT COUNT(*) FROM pg_partition_tree('test_metric');").Scan(&partitionsNum)
+	a.NoError(err)
+	// 1 the metric table itself + 1 dbname partition
+	// + 4 time partitions (1 we asked for + 3 precreated)
+	a.Equal(6, partitionsNum)
+
+	part := pgw.partitionMapMetricDbname["test_metric"]["test_db"]
+	// partition bounds should have a difference of 3 weeks
+	a.Equal(part.StartTime.Add(3*7*24*time.Hour), part.EndTime)
+}
+
+func Test_Maintain(t *testing.T) {
+	a := assert.New(t)
+	r := require.New(t)
+
+	pgContainer, pgTearDown, err := testutil.SetupPostgresContainer()
+	r.NoError(err)
+	defer pgTearDown()
+
+	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	r.NoError(err)
+	conn, err := pgx.Connect(ctx, connStr)
+	r.NoError(err)
+
+	opts := &CmdOpts{
+		PartitionInterval:   "1 hour",
+		RetentionInterval:   "1 hour",
+		MaintenanceInterval: "0 days",
+		BatchingDelay:       time.Hour,
+	}
+
+	pgw, err := NewPostgresWriter(ctx, connStr, opts)
+	r.NoError(err)
+
+	t.Run("MaintainUniqueSources", func(_ *testing.T) {
+		// adds an entry to `admin.all_distinct_dbname_metrics`
+		err = pgw.SyncMetric("test", "test_metric_1", AddOp)
+		r.NoError(err)
+
+		var numOfEntries int
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics;").Scan(&numOfEntries)
+		a.NoError(err)
+		a.Equal(1, numOfEntries)
+
+		// manually call the maintenance routine
+		pgw.MaintainUniqueSources()
+
+		// entry should have been deleted, because it has no corresponding entries in `test_metric_1` table.
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics;").Scan(&numOfEntries)
+		a.NoError(err)
+		a.Equal(0, numOfEntries)
+
+		message := []metrics.MeasurementEnvelope{
+			{
+				MetricName: "test_metric_1",
+				Data: metrics.Measurements{
+					{"number": 1, "string": "test_data"},
+				},
+				DBName: "test_db",
+			},
+		}
+		pgw.flush(message)
+
+		// manually call the maintenance routine
+		pgw.MaintainUniqueSources()
+
+		// entry should have been added, because there is a corresponding entry in `test_metric_1` table just written.
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics;").Scan(&numOfEntries)
+		a.NoError(err)
+		a.Equal(1, numOfEntries)
+
+		_, err = conn.Exec(ctx, "DROP TABLE test_metric_1;")
+		r.NoError(err)
+
+		// the corresponding entry should be deleted
+		pgw.MaintainUniqueSources()
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics;").Scan(&numOfEntries)
+		a.NoError(err)
+		a.Equal(0, numOfEntries)
+	})
+
+	t.Run("MaintainUniqueSources_MultipleMetricsAndSources", func(_ *testing.T) {
+		// Create metric tables with partitions
+		err = pgw.EnsureMetricDummy("test_metric_a")
+		r.NoError(err)
+		err = pgw.EnsureMetricDummy("test_metric_b")
+		r.NoError(err)
+
+		// Create partitions for each dbname
+		_, err = conn.Exec(ctx, `
+			CREATE TABLE subpartitions.test_metric_a_db1 PARTITION OF public.test_metric_a FOR VALUES IN ('db1');
+			CREATE TABLE subpartitions.test_metric_a_db2 PARTITION OF public.test_metric_a FOR VALUES IN ('db2');
+			CREATE TABLE subpartitions.test_metric_a_db3 PARTITION OF public.test_metric_a FOR VALUES IN ('db3');
+			CREATE TABLE subpartitions.test_metric_b_db1 PARTITION OF public.test_metric_b FOR VALUES IN ('db1');
+			CREATE TABLE subpartitions.test_metric_b_db2 PARTITION OF public.test_metric_b FOR VALUES IN ('db2');
+		`)
+		r.NoError(err)
+
+		// Directly insert test data with different dbnames
+		_, err = conn.Exec(ctx, `
+			INSERT INTO test_metric_a (time, dbname, data) VALUES 
+				(now(), 'db1', '{}'::jsonb),
+				(now(), 'db2', '{}'::jsonb),
+				(now(), 'db3', '{}'::jsonb)
+		`)
+		r.NoError(err)
+
+		_, err = conn.Exec(ctx, `
+			INSERT INTO test_metric_b (time, dbname, data) VALUES 
+				(now(), 'db1', '{}'::jsonb),
+				(now(), 'db2', '{}'::jsonb)
+		`)
+		r.NoError(err)
+
+		// Run maintenance
+		pgw.MaintainUniqueSources()
+
+		// Should have 3 entries for test_metric_a and 2 for test_metric_b
+		var count int
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_a';").Scan(&count)
+		a.NoError(err)
+		a.Equal(3, count)
+
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_b';").Scan(&count)
+		a.NoError(err)
+		a.Equal(2, count)
+
+		// Cleanup
+		_, err = conn.Exec(ctx, "DROP TABLE test_metric_a, test_metric_b;")
+		r.NoError(err)
+		pgw.MaintainUniqueSources()
+	})
+
+	t.Run("MaintainUniqueSources_StaleEntriesCleanup", func(_ *testing.T) {
+		// Create metric table
+		err = pgw.EnsureMetricDummy("test_metric_c")
+		r.NoError(err)
+
+		// Create partition for db_active
+		_, err = conn.Exec(ctx, `
+			CREATE TABLE subpartitions.test_metric_c_db_active PARTITION OF public.test_metric_c FOR VALUES IN ('db_active');
+		`)
+		r.NoError(err)
+
+		// Directly insert test data with one active dbname
+		_, err = conn.Exec(ctx, `
+			INSERT INTO test_metric_c (time, dbname, data) VALUES 
+				(now(), 'db_active', '{}'::jsonb)
+		`)
+		r.NoError(err)
+
+		// Manually add the active entry and stale entries to the listing table
+		_, err = conn.Exec(ctx, "INSERT INTO admin.all_distinct_dbname_metrics (dbname, metric) VALUES ('db_active', 'test_metric_c'), ('db_stale1', 'test_metric_c'), ('db_stale2', 'test_metric_c');")
+		r.NoError(err)
+
+		var count int
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_c';").Scan(&count)
+		a.NoError(err)
+		a.Equal(3, count) // 1 active + 2 stale
+
+		// Run maintenance - should remove stale entries
+		pgw.MaintainUniqueSources()
+
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_c';").Scan(&count)
+		a.NoError(err)
+		a.Equal(1, count) // only active one remains
+
+		var dbname string
+		err = conn.QueryRow(ctx, "SELECT dbname FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_c';").Scan(&dbname)
+		a.NoError(err)
+		a.Equal("db_active", dbname)
+
+		// Cleanup
+		_, err = conn.Exec(ctx, "DROP TABLE test_metric_c;")
+		r.NoError(err)
+		pgw.MaintainUniqueSources()
+	})
+
+	t.Run("MaintainUniqueSources_AdvisoryLock", func(_ *testing.T) {
+		// Create a second connection to simulate concurrent maintenance
+		conn2, err := pgx.Connect(ctx, connStr)
+		r.NoError(err)
+		defer conn2.Close(ctx)
+
+		// Create metric table and partition
+		err = pgw.EnsureMetricDummy("test_metric_d")
+		r.NoError(err)
+
+		_, err = conn.Exec(ctx, `
+			CREATE TABLE subpartitions.test_metric_d_db1 PARTITION OF public.test_metric_d FOR VALUES IN ('db1');
+		`)
+		r.NoError(err)
+
+		// Directly insert test data for only db1
+		_, err = conn.Exec(ctx, `
+			INSERT INTO test_metric_d (time, dbname, data) VALUES 
+				(now(), 'db1', '{}'::jsonb)
+		`)
+		r.NoError(err)
+
+		// Add both active and stale entries to the listing table
+		_, err = conn.Exec(ctx, "INSERT INTO admin.all_distinct_dbname_metrics (dbname, metric) VALUES ('db1', 'test_metric_d'), ('db_stale', 'test_metric_d');")
+		r.NoError(err)
+
+		var count int
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_d';").Scan(&count)
+		a.NoError(err)
+		a.Equal(2, count, "Should have 2 entries initially (1 active + 1 stale)")
+
+		// Acquire the advisory lock using session-level lock in conn2
+		// This will block transaction-level locks from the same lock ID
+		var lockAcquired bool
+		err = conn2.QueryRow(ctx, "SELECT pg_try_advisory_lock(1571543679778230000);").Scan(&lockAcquired)
+		r.NoError(err)
+		a.True(lockAcquired, "Should acquire advisory lock")
+
+		// Try to run maintenance - should skip because lock is held by conn2
+		pgw.MaintainUniqueSources()
+
+		// Stale entry should still exist because maintenance was skipped
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_d';").Scan(&count)
+		a.NoError(err)
+		a.Equal(2, count, "Stale entry should remain because maintenance was skipped due to lock")
+
+		// Release lock from conn2
+		_, err = conn2.Exec(ctx, "SELECT pg_advisory_unlock(1571543679778230000);")
+		r.NoError(err)
+
+		// Now maintenance should work and clean up stale entry
+		pgw.MaintainUniqueSources()
+
+		// Should only have the active entry, stale one removed
+		err = conn.QueryRow(ctx, "SELECT count(*) FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_d';").Scan(&count)
+		a.NoError(err)
+		a.Equal(1, count, "Only active entry should remain after maintenance runs")
+
+		var dbname string
+		err = conn.QueryRow(ctx, "SELECT dbname FROM admin.all_distinct_dbname_metrics WHERE metric = 'test_metric_d';").Scan(&dbname)
+		a.NoError(err)
+		a.Equal("db1", dbname, "Remaining entry should be the active one")
+
+		// Cleanup
+		_, err = conn.Exec(ctx, "DROP TABLE test_metric_d;")
+		r.NoError(err)
+		pgw.MaintainUniqueSources()
+	})
+
+	t.Run("DeleteOldPartitions", func(_ *testing.T) {
+		// Creates a new top level table for `test_metric_2`
+		err = pgw.SyncMetric("test", "test_metric_2", AddOp)
+		r.NoError(err)
+
+		// create the 2nd level dbname partition
+		_, err = conn.Exec(ctx, "CREATE TABLE subpartitions.test_metric_2_dbname PARTITION OF public.test_metric_2 FOR VALUES IN ('test') PARTITION BY RANGE (time)")
+		a.NoError(err)
+
+		boundStart := time.Now().Add(-1 * 2 * 24 * time.Hour).Format("2006-01-02")
+		boundEnd := time.Now().Add(-1 * 24 * time.Hour).Format("2006-01-02")
+
+		// create the 3rd level time partition with end bound yesterday
+		_, err = conn.Exec(ctx,
+			fmt.Sprintf(
+				`CREATE TABLE subpartitions.test_metric_2_dbname_time 
+			PARTITION OF subpartitions.test_metric_2_dbname 
+			FOR VALUES FROM ('%s') TO ('%s')`,
+				boundStart, boundEnd),
+		)
+		a.NoError(err)
+		_, err = conn.Exec(ctx, "COMMENT ON TABLE subpartitions.test_metric_2_dbname_time IS $$pgwatch-generated-metric-dbname-time-lvl$$")
+		a.NoError(err)
+
+		var partitionsNum int
+		err = conn.QueryRow(ctx, "SELECT COUNT(*) FROM pg_partition_tree('test_metric_2');").Scan(&partitionsNum)
+		a.NoError(err)
+		a.Equal(3, partitionsNum)
+
+		pgw.opts.RetentionInterval = "2 days"
+		pgw.DeleteOldPartitions() // 1 day < 2 days, shouldn't delete anything
+
+		err = conn.QueryRow(ctx, "SELECT COUNT(*) FROM pg_partition_tree('test_metric_2');").Scan(&partitionsNum)
+		a.NoError(err)
+		a.Equal(3, partitionsNum)
+
+		pgw.opts.RetentionInterval = "1 hour"
+		pgw.DeleteOldPartitions() // 1 day > 1 hour, should delete the partition
+
+		err = conn.QueryRow(ctx, "SELECT COUNT(*) FROM pg_partition_tree('test_metric_2');").Scan(&partitionsNum)
+		a.NoError(err)
+		a.Equal(2, partitionsNum)
+	})
+
+	t.Run("Epoch to Duration Conversion", func(_ *testing.T) {
+		table := map[string]time.Duration{
+			"1 hour":   time.Hour,
+			"2 hours":  2 * time.Hour,
+			"4 days":   4 * 24 * time.Hour,
+			"1 day":    24 * time.Hour,
+			"1 year":   365.25 * 24 * time.Hour,
+			"1 week":   7 * 24 * time.Hour,
+			"3 weeks":  3 * 7 * 24 * time.Hour,
+			"2 months": 2 * 30 * 24 * time.Hour,
+			"1 month":  30 * 24 * time.Hour,
+		}
+
+		for k, v := range table {
+			opts := &CmdOpts{
+				PartitionInterval:   "1 hour",
+				RetentionInterval:   k,
+				MaintenanceInterval: k,
+				BatchingDelay:       time.Hour,
+			}
+
+			pgw, err := NewPostgresWriter(ctx, connStr, opts)
+			a.NoError(err)
+			a.Equal(pgw.retentionInterval, v)
+			a.Equal(pgw.maintenanceInterval, v)
+		}
+	})
 }

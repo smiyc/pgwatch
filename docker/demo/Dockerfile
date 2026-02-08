@@ -23,7 +23,7 @@ RUN yarn build
 # ----------------------------------------------------------------
 # 3. Go Dependencies and Tools (cached separately)
 # ----------------------------------------------------------------
-FROM golang:1.24 AS go-deps
+FROM golang:1.25 AS go-deps
 # Install protoc and required tools for protobuf generation
 RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
@@ -45,12 +45,12 @@ ARG GIT_TIME
 
 # Copy source code
 COPY . .
-# Copy built WebUI from previous stage
-COPY --from=webui-builder /webui/build ./internal/webui/build
+# Copy built WebUI from previous stage to webserver package
+COPY --from=webui-builder /webserver/build ./internal/webserver/build
 
 # Generate protobuf and build the application
 RUN go generate ./api/pb/ && \
-    CGO_ENABLED=0 go build -ldflags "\
+    CGO_ENABLED=0 GOEXPERIMENT=greenteagc go build -ldflags "\
         -X 'main.commit=${GIT_HASH}' \
         -X 'main.date=${GIT_TIME}' \
         -X 'main.version=${VERSION}'" ./cmd/pgwatch
@@ -58,7 +58,7 @@ RUN go generate ./api/pb/ && \
 # ----------------------------------------------------------------
 # 5. Demo Image with PostgreSQL + Grafana
 # ----------------------------------------------------------------
-FROM postgres:17-bullseye AS demo
+FROM postgres:18-bookworm AS demo
 
 # Copy over the compiled gatherer
 COPY --from=go-builder /pgwatch/pgwatch /pgwatch/
@@ -72,7 +72,7 @@ RUN apt-get update \
     && curl -L "https://www.postgresql.org/media/keys/ACCC4CF8.asc" | apt-key add - \
     && curl -s https://packagecloud.io/install/repositories/timescale/timescaledb/script.deb.sh | bash \
     && apt-get -qy install \
-        timescaledb-2-postgresql-17 postgresql-plpython3-17 postgresql-17-pg-qualstats \
+        timescaledb-2-postgresql-18 postgresql-plpython3-18 postgresql-18-pg-qualstats \
         supervisor python3-psutil libfontconfig1 \
     && apt-get purge -y --auto-remove \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -81,12 +81,12 @@ RUN apt-get update \
 RUN curl -L https://apt.grafana.com/gpg.key | apt-key add - \
     && echo "deb https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list \
     && apt-get update \
-    && apt-get -qy install grafana=12.1.0 \
+    && apt-get -qy install grafana=12.3.1 \
     && grafana-cli plugins install marcusolsson-treemap-panel
 COPY docker/demo/grafana.ini /etc/grafana/grafana.ini
 COPY grafana/postgres_datasource.yml /etc/grafana/provisioning/datasources/pg_ds.yml
 COPY grafana/dashboards.yml /etc/grafana/provisioning/dashboards/pg_db.yml
-COPY grafana/postgres/v12/ /var/lib/grafana/dashboards/
+COPY grafana/postgres/v12/ /var/lib/grafana/dashboards/postgres/
 
 # Set up supervisord [https://docs.docker.com/engine/admin/using_supervisord/]
 COPY docker/demo/supervisord.conf /etc/supervisor/
